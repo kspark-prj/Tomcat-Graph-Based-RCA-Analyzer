@@ -1,0 +1,281 @@
+2026-07-10 21:00:00.000 [main] INFO  org.apache.catalina.startup.Catalina - Server initialize raised
+2026-07-10 21:00:02.000 [main] INFO  org.apache.catalina.core.StandardService - Starting service [Catalina]
+2026-07-10 21:06:15.000 [http-nio-8080-exec-0] WARN  com.example.controller.OrderController - Invalid parameter received
+2026-07-10 21:06:15.000 [http-nio-8080-exec-0] ERROR com.example.service.UserService - User NotFoundException: user_id=100
+    at com.example.service.UserService.getUserDetails(UserService.java:112)
+    at com.example.controller.UserController.getProfile(UserController.java:45)
+2026-07-10 21:07:30.000 [http-nio-8080-exec-1] WARN  com.example.controller.OrderController - Invalid parameter received
+2026-07-10 21:07:30.000 [http-nio-8080-exec-1] ERROR com.example.service.UserService - User NotFoundException: user_id=101
+    at com.example.service.UserService.getUserDetails(UserService.java:112)
+    at com.example.controller.UserController.getProfile(UserController.java:45)
+2026-07-10 21:08:45.000 [http-nio-8080-exec-2] WARN  com.example.controller.OrderController - Invalid parameter received
+2026-07-10 21:08:45.000 [http-nio-8080-exec-2] ERROR com.example.service.UserService - User NotFoundException: user_id=102
+    at com.example.service.UserService.getUserDetails(UserService.java:112)
+    at com.example.controller.UserController.getProfile(UserController.java:45)
+2026-07-10 21:10:00.000 [http-nio-8080-exec-3] WARN  com.example.controller.OrderController - Invalid parameter received
+2026-07-10 21:10:00.000 [http-nio-8080-exec-3] ERROR com.example.service.UserService - User NotFoundException: user_id=103
+    at com.example.service.UserService.getUserDetails(UserService.java:112)
+    at com.example.controller.UserController.getProfile(UserController.java:45)
+2026-07-10 21:11:15.000 [http-nio-8080-exec-4] WARN  com.example.controller.OrderController - Invalid parameter received
+2026-07-10 21:11:15.000 [http-nio-8080-exec-4] ERROR com.example.service.UserService - User NotFoundException: user_id=104
+    at com.example.service.UserService.getUserDetails(UserService.java:112)
+    at com.example.controller.UserController.getProfile(UserController.java:45)
+2026-07-10 21:15:05.000 [http-nio-8080-exec-DB-0] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:10.000 [http-nio-8080-exec-APP-1] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:15.000 [http-nio-8080-exec-DB-2] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:20.000 [http-nio-8080-exec-APP-3] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:25.000 [http-nio-8080-exec-DB-4] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:30.000 [http-nio-8080-exec-APP-5] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:35.000 [http-nio-8080-exec-DB-6] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:40.000 [http-nio-8080-exec-APP-7] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:45.000 [http-nio-8080-exec-DB-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:50.000 [http-nio-8080-exec-APP-9] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:15:55.000 [http-nio-8080-exec-DB-10] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:00.000 [http-nio-8080-exec-APP-11] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:05.000 [http-nio-8080-exec-DB-12] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:10.000 [http-nio-8080-exec-APP-13] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:15.000 [http-nio-8080-exec-DB-14] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:20.000 [http-nio-8080-exec-APP-15] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:25.000 [http-nio-8080-exec-DB-16] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:30.000 [http-nio-8080-exec-APP-17] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:35.000 [http-nio-8080-exec-DB-18] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:40.000 [http-nio-8080-exec-APP-19] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:45.000 [http-nio-8080-exec-DB-20] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:50.000 [http-nio-8080-exec-APP-21] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:16:55.000 [http-nio-8080-exec-DB-22] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:00.000 [http-nio-8080-exec-APP-23] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:05.000 [http-nio-8080-exec-DB-24] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:10.000 [http-nio-8080-exec-APP-25] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:15.000 [http-nio-8080-exec-DB-26] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:20.000 [http-nio-8080-exec-APP-27] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:25.000 [http-nio-8080-exec-DB-28] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:30.000 [http-nio-8080-exec-APP-29] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:35.000 [http-nio-8080-exec-DB-30] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:40.000 [http-nio-8080-exec-APP-31] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:45.000 [http-nio-8080-exec-DB-32] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:50.000 [http-nio-8080-exec-APP-33] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:17:55.000 [http-nio-8080-exec-DB-34] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:00.000 [http-nio-8080-exec-APP-35] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:05.000 [http-nio-8080-exec-DB-36] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:10.000 [http-nio-8080-exec-APP-37] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:15.000 [http-nio-8080-exec-DB-38] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:20.000 [http-nio-8080-exec-APP-39] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:25.000 [http-nio-8080-exec-DB-40] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:30.000 [http-nio-8080-exec-APP-41] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:35.000 [http-nio-8080-exec-DB-42] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:40.000 [http-nio-8080-exec-APP-43] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:45.000 [http-nio-8080-exec-DB-44] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:50.000 [http-nio-8080-exec-APP-45] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:18:55.000 [http-nio-8080-exec-DB-46] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:19:00.000 [http-nio-8080-exec-APP-47] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:19:05.000 [http-nio-8080-exec-DB-48] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Connection is not available, request timed out after 30000ms.
+    at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:696)
+    at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:34)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:19:10.000 [http-nio-8080-exec-APP-49] ERROR com.example.service.OrderService - Order processing failed due to internal error
+    at com.example.repository.OrderRepository.saveOrder(OrderRepository.java:39)
+    at com.example.service.OrderService.placeOrder(OrderService.java:78)
+    at com.example.controller.OrderController.checkout(OrderController.java:52)
+2026-07-10 21:26:00.000 [http-nio-8080-exec-tail-0] WARN  com.example.util.ExternalApiConnector - API Gateway Response Timeout
+    at com.example.util.ExternalApiConnector.sendRequest(ExternalApiConnector.java:88)
+    at com.example.service.PaymentService.processPayment(PaymentService.java:41)
+2026-07-10 21:27:00.000 [http-nio-8080-exec-tail-1] WARN  com.example.util.ExternalApiConnector - API Gateway Response Timeout
+    at com.example.util.ExternalApiConnector.sendRequest(ExternalApiConnector.java:88)
+    at com.example.service.PaymentService.processPayment(PaymentService.java:41)
+2026-07-10 21:28:00.000 [http-nio-8080-exec-tail-2] WARN  com.example.util.ExternalApiConnector - API Gateway Response Timeout
+    at com.example.util.ExternalApiConnector.sendRequest(ExternalApiConnector.java:88)
+    at com.example.service.PaymentService.processPayment(PaymentService.java:41)
