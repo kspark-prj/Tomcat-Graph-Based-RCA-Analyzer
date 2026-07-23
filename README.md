@@ -8,6 +8,8 @@
 
 ---
 
+<img src="./main.png" width="500" height="300">
+
 ## ✨ 핵심 기능 (Key Features)
 
 - **Graph DB Architecture**: `Thread -> Exception -> Method -> Class`로 이어지는 복잡한 스택 트레이스 관계를 그래프 모델 스키마로 설계하여 `MATCH`/`MERGE` 쿼리로 정밀 추적합니다.
