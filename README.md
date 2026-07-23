@@ -38,6 +38,83 @@
 
 ---
 
+## 🔄 로그 기반 데이터 변환 및 저장 프로세스 (Parsing & Indexing Flow)
+
+`catalina.out` 로그 파일의 텍스트 한 줄 한 줄이 파싱되어 그래프 DB 노드와 관계(Edge)로 변환되는 전체 프로세스입니다.
+
+### 1. 처리 알고리즘 흐름
+
+```text
+[ 1. 스키마 & Primary Key 인덱스 정의 ]
+                   ↓
+[ 2. ERROR 헤더 로그 감지 (Regex 매칭) ]
+                   ↓
+[ 3. Thread & Exception 노드 / RAISED 관계 생성 ]
+                   ↓
+[ 4. 스택 트레이스 연속 블록 수집 (최대 Depth 5) ]
+                   ↓
+[ 5. Root Method 추출 / OCCURRED_IN 관계 연결 ]
+                   ↓
+[ 6. 스택 역순 분석으로 상위 호출자(CALLS) 연결 ]
+
+```
+
+### 2. 실제 로그 텍스트 ➔ 그래프 DB 변환 예시
+
+#### 📄 파싱 대상 로그
+
+```text
+2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.controller.OrderController - java.sql.SQLException: Connection timeout
+	at com.example.repository.OrderRepository.findOrder(OrderRepository.java:45)
+	at com.example.service.OrderService.processOrder(OrderService.java:30)
+	at com.example.controller.OrderController.create(OrderController.java:15)
+
+```
+
+#### ⚙️ 단계별 그래프 DB 매핑 동작
+
+1. **ERROR 헤더 라인 분석**:
+
+- `Thread` 노드 생성 (`name: 'http-nio-8080-exec-5'`)
+- `Exception` 노드 생성 (`id: 'err_1'`, `type: 'java.sql.SQLException'`, `message: 'Connection timeout'`)
+- `(Thread) -[:RAISED]-> (Exception)` 관계 연결
+
+2. **첫 번째 스택 트레이스 라인 (에러 직접 발생 지점 / Root Cause)**:
+
+- `at com.example.repository.OrderRepository.findOrder(...)`
+- `Class` (`OrderRepository`) 및 `Method` (`OrderRepository.findOrder`) 노드 생성
+- 근본 원인이므로 `(Exception) -[:OCCURRED_IN]-> (Method:findOrder)` 직접 연결
+
+3. **연속된 스택 트레이스 라인 분석 (상위 호출 체인 추적)**:
+
+- 다음 `ERROR` 또는 일반 로그가 나오기 전까지 연속된 `at ...` 줄을 하나의 호출 묶음(Call Chain)으로 인식합니다.
+- 자바 스택 특성상 **아래 줄이 위 줄을 호출한 상위 호출자**입니다.
+- `(OrderService.processOrder) -[:CALLS]-> (OrderRepository.findOrder)`
+- `(OrderController.create) -[:CALLS]-> (OrderService.processOrder)`
+
+#### 🌐 최종 완성된 그래프 데이터 토폴로지
+
+```text
+(Thread: http-nio-8080-exec-5)
+       │
+   [RAISED]
+       ↓
+(Exception: err_1 / SQLException) ──[OCCURRED_IN]──> (Method: OrderRepository.findOrder) ──[BELONGS_TO]──> (Class: OrderRepository)
+                                                                    ▲
+                                                                [CALLS]
+                                                                    │
+                                                     (Method: OrderService.processOrder) ──[BELONGS_TO]──> (Class: OrderService)
+                                                                    ▲
+                                                                [CALLS]
+                                                                    │
+                                                     (Method: OrderController.create)    ──[BELONGS_TO]──> (Class: OrderController)
+
+```
+
+- **포인트 (In-Memory Index & MERGE)**: `MERGE` 구문과 PK 인덱스(`Thread.name`, `Exception.id`, `Method.fullName`) 덕분에 중복 노드가 자동 제거되며, 수만 건의 에러 로그가 들어와도 동일한 메서드 노드에 가지처럼 에러들이 연결되어 파급 효과를 직관적으로 분석할 수 있습니다.
+
+---
+
 ## 🚀 시작하기 (Getting Started)
 
 ### 1. 필수 패키지 설치
@@ -46,9 +123,8 @@
 
 ```bash
 pip install PyQt6 kuzu
-```
 
-````
+```
 
 ### 2. 프로젝트 실행
 
@@ -86,4 +162,3 @@ res_root = self.conn.execute(root_query)
 ```
 
 ```
-````
