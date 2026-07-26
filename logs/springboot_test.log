@@ -1,0 +1,497 @@
+2026-07-26T15:40:25.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:40:29.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:40:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:40:40.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:40:43.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:67)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:66)
+2026-07-26T15:40:49.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:40:51.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : User authentication success: user@example.com
+2026-07-26T15:40:56.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:41:00.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:41:05.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : User authentication success: user@example.com
+2026-07-26T15:41:10.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:146)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:29)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:18)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:27)
+2026-07-26T15:41:17.496+09:00  ERROR 12345 --- [scheduling-1] com.example.demo.repository.UserRepository : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:45)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:82)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:48)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:26)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:12)
+2026-07-26T15:41:18.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:83)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:44)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:132)
+2026-07-26T15:41:27.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:41:31.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:41:38.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:41:46.496+09:00  DEBUG 12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:41:51.496+09:00  INFO  12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:41:55.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:104)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:107)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:47)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:47)
+2026-07-26T15:42:03.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:42:12.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:42:16.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:42:25.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:42:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:42:32.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:42:38.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:42:43.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:92)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:130)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:65)
+2026-07-26T15:42:44.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T15:42:50.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:42:51.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:42:55.496+09:00  DEBUG 12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:42:59.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:43:08.496+09:00  WARN  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:43:10.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:43:16.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : User authentication success: user@example.com
+2026-07-26T15:43:17.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:43:20.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:43:27.496+09:00  DEBUG 12345 --- [task-executor-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:43:29.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:43:32.496+09:00  WARN  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:43:36.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:43:45.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:43:50.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:43:54.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:44:02.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:44:09.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:44:18.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:44:19.496+09:00  INFO  12345 --- [task-executor-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:44:27.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:44:37.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:44:47.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:44:50.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:44:56.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:32)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:146)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:23)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:48)
+2026-07-26T15:44:59.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:45:03.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:45:13.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:26)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:148)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:14)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:14)
+2026-07-26T15:45:18.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:45:27.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:45:37.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:45:41.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:45:51.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : User authentication success: user@example.com
+2026-07-26T15:45:53.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:46:01.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:46:10.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T15:46:12.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:109)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:62)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:28)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:10)
+2026-07-26T15:46:15.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:46:20.496+09:00  INFO  12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:46:22.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:46:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:46:35.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:46:40.496+09:00  DEBUG 12345 --- [task-executor-1] com.example.demo.repository.UserRepository : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:46:49.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.service.PaymentService  : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:77)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:142)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:34)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:48)
+2026-07-26T15:46:52.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:46:54.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:47:04.496+09:00  DEBUG 12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:47:09.496+09:00  DEBUG 12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:47:14.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:47:23.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : User authentication success: user@example.com
+2026-07-26T15:47:27.496+09:00  ERROR 12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:82)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:103)
+2026-07-26T15:47:37.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:47:45.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:47:48.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:47:52.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:47:59.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:48:01.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:48:02.496+09:00  WARN  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:48:11.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.example.demo.repository.UserRepository : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:58)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:70)
+2026-07-26T15:48:13.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:48:19.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:48:26.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:48:32.496+09:00  DEBUG 12345 --- [task-executor-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:48:35.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.service.PaymentService  : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:54)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:123)
+2026-07-26T15:48:40.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T15:48:46.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:48:56.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:48:58.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:124)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:80)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:37)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:32)
+2026-07-26T15:48:59.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:49:04.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : User authentication success: user@example.com
+2026-07-26T15:49:05.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:49:15.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T15:49:22.496+09:00  DEBUG 12345 --- [task-executor-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : User authentication success: user@example.com
+2026-07-26T15:49:31.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:49:39.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:49:47.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:49:57.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:144)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:148)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:46)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:43)
+2026-07-26T15:50:06.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:50:12.496+09:00  DEBUG 12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:50:22.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:50:29.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:50:39.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:50:44.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:50:51.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:50:52.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:50:56.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:51:04.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.repository.UserRepository : User authentication success: user@example.com
+2026-07-26T15:51:11.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:51:14.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:51:15.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:51:16.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:51:25.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T15:51:31.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:51:33.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:51:43.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:51:44.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:51:46.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T15:51:55.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:53)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:84)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:131)
+2026-07-26T15:52:03.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:52:09.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:99)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:37)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:122)
+2026-07-26T15:52:13.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:52:22.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:52:26.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:52:34.496+09:00  DEBUG 12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:52:36.496+09:00  ERROR 12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:86)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:66)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:22)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:49)
+2026-07-26T15:52:42.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:52:47.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:52:54.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.repository.UserRepository : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:70)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:68)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:134)
+2026-07-26T15:52:59.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:53:03.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:53:13.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T15:53:21.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : User authentication success: user@example.com
+2026-07-26T15:53:26.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:53:27.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:53:31.496+09:00  INFO  12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:53:40.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:90)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:59)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:93)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:30)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:34)
+2026-07-26T15:53:46.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:53:56.496+09:00  DEBUG 12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:54:02.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:54:06.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:54:09.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:54:18.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:54:20.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:54:28.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:51)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:35)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:148)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:19)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:32)
+2026-07-26T15:54:30.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:54:40.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:54:42.496+09:00  ERROR 12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:81)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:136)
+2026-07-26T15:54:46.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:54:54.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:55:03.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:55:08.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:55:14.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:55:19.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:55:24.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.service.PaymentService  : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:75)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:22)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:42)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:10)
+2026-07-26T15:55:26.496+09:00  DEBUG 12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:55:28.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:55:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:55:38.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T15:55:42.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:55:52.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:55:57.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T15:56:05.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:56:12.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:56:13.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:56:16.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:56:18.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:56:25.496+09:00  ERROR 12345 --- [task-executor-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:118)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:35)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:126)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:42)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:48)
+2026-07-26T15:56:34.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:56:35.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:56:42.496+09:00  ERROR 12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:146)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:67)
+2026-07-26T15:56:49.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:56:58.496+09:00  ERROR 12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:143)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:78)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:120)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:34)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:27)
+2026-07-26T15:57:02.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:57:03.496+09:00  WARN  12345 --- [scheduling-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:57:11.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.repository.UserRepository : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:58)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:66)
+2026-07-26T15:57:15.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.controller.OrderController : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:47)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:45)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:144)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:39)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:11)
+2026-07-26T15:57:17.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:57:22.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:57:25.496+09:00  WARN  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : User authentication success: user@example.com
+2026-07-26T15:57:31.496+09:00  DEBUG 12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:57:40.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T15:57:46.496+09:00  ERROR 12345 --- [task-executor-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:106)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:130)
+2026-07-26T15:57:55.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:44)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:46)
+2026-07-26T15:57:59.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:58:00.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:58:01.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:58:08.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T15:58:14.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:58:18.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:83)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:147)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:34)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:39)
+2026-07-26T15:58:22.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T15:58:29.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:110)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:52)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:148)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:16)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:16)
+2026-07-26T15:58:31.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:58:37.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:58:45.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:58:49.496+09:00  WARN  12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T15:58:56.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T15:59:03.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:59:11.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:59:20.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T15:59:23.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T15:59:29.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:59:35.496+09:00  INFO  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T15:59:40.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T15:59:48.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:110)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:35)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:66)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:50)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:44)
+2026-07-26T15:59:50.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T15:59:54.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:00:04.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:00:13.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:00:22.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:00:31.496+09:00  WARN  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T16:00:34.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T16:00:44.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:00:45.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T16:00:50.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:01:00.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:01:09.496+09:00  DEBUG 12345 --- [task-executor-1] com.example.demo.controller.OrderController : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:01:14.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:69)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:133)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:45)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:14)
+2026-07-26T16:01:20.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Fetching user profile from database for user_id: 1042
+2026-07-26T16:01:22.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:01:25.496+09:00  DEBUG 12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : User authentication success: user@example.com
+2026-07-26T16:01:34.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:01:37.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Fetching user profile from database for user_id: 1042
+2026-07-26T16:01:46.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:01:52.496+09:00  INFO  12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:02:01.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:02:08.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T16:02:17.496+09:00  INFO  12345 --- [task-executor-1] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:02:23.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:02:32.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:61)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:74)
+Caused by: java.net.SocketTimeoutException: Read timed out at java.net.SocketInputStream.socketRead0
+	at com.example.demo.service.PaymentService.processPayment(PaymentService.java:33)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:21)
+2026-07-26T16:02:34.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T16:02:39.496+09:00  DEBUG 12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:02:47.496+09:00  DEBUG 12345 --- [scheduling-1] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T16:02:51.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:129)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:85)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:100)
+2026-07-26T16:03:00.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:03:04.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Fetching user profile from database for user_id: 1042
+2026-07-26T16:03:05.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:03:12.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:03:20.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T16:03:30.496+09:00  WARN  12345 --- [http-nio-8080-exec-1] com.example.demo.repository.UserRepository : User authentication success: user@example.com
+2026-07-26T16:03:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:03:39.496+09:00  DEBUG 12345 --- [task-executor-1] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:03:40.496+09:00  INFO  12345 --- [scheduling-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:03:41.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:121)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:112)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:60)
+2026-07-26T16:03:44.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.example.demo.repository.UserRepository : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:03:48.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:03:58.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:04:01.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:04:03.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] org.springframework.web.servlet.DispatcherServlet : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:54)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:79)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:67)
+2026-07-26T16:04:13.496+09:00  INFO  12345 --- [task-executor-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:04:17.496+09:00  ERROR 12345 --- [scheduling-1] com.example.demo.service.PaymentService  : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:78)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:115)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:132)
+2026-07-26T16:04:19.496+09:00  WARN  12345 --- [scheduling-1] com.zaxxer.hikari.pool.HikariPool        : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:04:23.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:04:27.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T16:04:35.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:04:44.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:04:45.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:04:50.496+09:00  INFO  12345 --- [scheduling-1] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T16:04:51.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:04:59.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:05:00.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:05:07.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.controller.OrderController : java.lang.NullPointerException: Cannot invoke "com.example.demo.domain.User.getEmail()" because "user" is null
+	at com.example.demo.service.NotificationService.sendEmailNotice(NotificationService.java:130)
+	at com.example.demo.service.OrderService.completeOrder(OrderService.java:150)
+	at com.example.demo.controller.OrderController.createOrder(OrderController.java:115)
+2026-07-26T16:05:16.496+09:00  ERROR 12345 --- [http-nio-8080-exec-1] com.zaxxer.hikari.pool.HikariPool        : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:92)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:134)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:87)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:32)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:24)
+2026-07-26T16:05:24.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:05:26.496+09:00  WARN  12345 --- [scheduling-1] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T16:05:31.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:05:39.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:05:49.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T16:05:52.496+09:00  WARN  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:05:56.496+09:00  ERROR 12345 --- [scheduling-1] com.example.demo.repository.UserRepository : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:94)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:126)
+2026-07-26T16:05:57.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:06:04.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:06:10.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T16:06:18.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T16:06:21.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.repository.UserRepository : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:113)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:24)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:119)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:16)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:15)
+2026-07-26T16:06:23.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : User authentication success: user@example.com
+2026-07-26T16:06:26.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : Fetching user profile from database for user_id: 1042
+2026-07-26T16:06:36.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] org.springframework.web.servlet.DispatcherServlet : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:06:42.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:34)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:51)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:134)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:33)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:48)
+2026-07-26T16:06:44.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.controller.OrderController : User authentication success: user@example.com
+2026-07-26T16:06:54.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.example.demo.repository.UserRepository : Fetching user profile from database for user_id: 1042
+2026-07-26T16:07:03.496+09:00  DEBUG 12345 --- [http-nio-8080-exec-1] com.example.demo.service.PaymentService  : Completed 200 OK for request [/api/v1/orders]
+2026-07-26T16:07:09.496+09:00  INFO  12345 --- [task-executor-1] com.example.demo.service.PaymentService  : Fetching user profile from database for user_id: 1042
+2026-07-26T16:07:15.496+09:00  WARN  12345 --- [http-nio-8080-exec-2] com.zaxxer.hikari.pool.HikariPool        : User authentication success: user@example.com
+2026-07-26T16:07:18.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.example.demo.controller.OrderController : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:95)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:107)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:116)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:49)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:46)
+2026-07-26T16:07:19.496+09:00  ERROR 12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:112)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:99)
+2026-07-26T16:07:22.496+09:00  INFO  12345 --- [http-nio-8080-exec-1] com.example.demo.controller.OrderController : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:07:32.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:07:34.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Scheduled task executed successfully: CleanupTempFiles
+2026-07-26T16:07:40.496+09:00  ERROR 12345 --- [http-nio-8080-exec-3] com.zaxxer.hikari.pool.HikariPool        : org.springframework.dao.CannotAcquireLockException: Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:97)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:36)
+	at com.example.demo.controller.UserController.getUserInfo(UserController.java:84)
+Caused by: com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Exception during pool initialization: Connection is not available, request timed out after 30000ms.
+	at com.example.demo.repository.UserRepository.findById(UserRepository.java:32)
+	at com.example.demo.service.UserService.getUserDetails(UserService.java:28)
+2026-07-26T16:07:43.496+09:00  ERROR 12345 --- [task-executor-1] com.example.demo.controller.OrderController : io.jsonwebtoken.ExpiredJwtException: JWT expired at 2026-07-26T17:00:00Z. Current time: 2026-07-26T17:30:00Z
+	at com.example.demo.security.JwtTokenProvider.validateToken(JwtTokenProvider.java:33)
+	at com.example.demo.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:148)
+2026-07-26T16:07:53.496+09:00  INFO  12345 --- [http-nio-8080-exec-2] com.example.demo.service.PaymentService  : Initializing Servlet 'dispatcherServlet'
+2026-07-26T16:08:03.496+09:00  INFO  12345 --- [http-nio-8080-exec-3] org.hibernate.engine.jdbc.spi.SqlExceptionHelper : Completed 200 OK for request [/api/v1/orders]

@@ -29,18 +29,27 @@ from PyQt6.QtWidgets import (
 DB_PATH = "./kuzu_springboot_db"
 
 
+def escape_cypher(text: str) -> str:
+    """Cypher 쿼리 내 문자열 리터럴에서 발생할 수 있는 이스케이프 에러 방지"""
+    if not text:
+        return ""
+    return text.replace("\\", "\\\\").replace("'", "\\'").replace("\r", " ").replace("\n", " ")
+
+
 class LogParseWorker(QThread):
     progress = pyqtSignal(str)
     finished = pyqtSignal()
 
-    def __init__(self, file_path, db):
+    def __init__(self, file_path, db_path):
         super().__init__()
         self.file_path = file_path
-        self.db = db
+        self.db_path = db_path
 
     def run(self):
+        # Worker 전용 연결 생성 (메인 스레드의 연결은 잠시 해제된 상태여야 함)
         try:
-            conn = kuzu.Connection(self.db)
+            db = kuzu.Database(self.db_path)
+            conn = kuzu.Connection(db)
         except Exception as e:
             print(f"워커 DB 연결 실패: {e}")
             self.finished.emit()
@@ -50,98 +59,142 @@ class LogParseWorker(QThread):
         log_pattern = re.compile(
             r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(?:[+-]\d{2}:\d{2})?)\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s+(\d+)\s+---\s+\[([^\]]+)\]\s+([\w\.\$]+)\s+:\s+(.*)"
         )
-        # Exception StackTrace 패턴 (탭 또는 공백으로 시작하는 at 구문)
+        # Exception StackTrace 패턴 (at 구문)
         stack_pattern = re.compile(r"^\s+at\s+([\w\.\$]+)\.([\w\<]+)\(([^:]+):?(\d+)?\)")
+        caused_by_pattern = re.compile(r"^\s*Caused by:\s+([\w\.\$]+):\s*(.*)")
 
-        current_exception_id = 0
         if not os.path.exists(self.file_path):
             self.finished.emit()
             return
 
-        with open(self.file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
+
+        current_ex_id = None
 
         for i, line in enumerate(lines):
             match = log_pattern.match(line)
             if match:
                 raw_timestamp, log_level, pid, thread_name, logger, raw_msg = match.groups()
 
-                # ERROR 또는 예외가 포함된 스택트레이스 발생 구간만 대상 처리
+                # ERROR 등 예외 발생 구간만 분석 대상 처리
                 if log_level != "ERROR":
                     continue
-
-                current_exception_id += 1
-                ex_id = f"err_{current_exception_id}"
 
                 # 타임스탬프 포맷 정제 ('T' 문자를 공백으로 변환 및 시차 표기 정제)
                 clean_timestamp = raw_timestamp.replace("T", " ").split("+")[0].split(".")[0]
 
                 if " : " in raw_msg:
                     parts = raw_msg.split(" : ", 1)
-                    ex_type = parts[0]
-                    ex_msg = parts[1]
+                    ex_type, ex_msg = parts[0], parts[1]
                 elif ":" in raw_msg:
                     parts = raw_msg.split(":", 1)
-                    ex_type = parts[0].strip()
-                    ex_msg = parts[1].strip()
+                    ex_type, ex_msg = parts[0].strip(), parts[1].strip()
                 else:
                     ex_type = logger.split(".")[-1]
                     ex_msg = raw_msg
 
-                ex_msg = ex_msg.replace("'", "\\'")
-                thread_name = thread_name.strip().replace("'", "\\'")
+                # 라인 번호 기반 고유 ID 생성
+                current_ex_id = f"err_{i}_{int(time.time())}"
+                ex_type_esc = escape_cypher(ex_type)
+                ex_msg_esc = escape_cypher(ex_msg)
+                thread_name_esc = escape_cypher(thread_name.strip())
 
-                conn.execute(f"MERGE (t:Thread {{name: '{thread_name}'}})")
+                conn.execute(f"MERGE (t:Thread {{name: '{thread_name_esc}'}})")
                 conn.execute(
-                    f"MERGE (ex:Exception {{id: '{ex_id}', type: '{ex_type}', message: '{ex_msg}', timestamp: timestamp('{clean_timestamp}')}})"
+                    f"MERGE (ex:Exception {{id: '{current_ex_id}', type: '{ex_type_esc}', message: '{ex_msg_esc}', timestamp: timestamp('{clean_timestamp}')}})"
                 )
                 conn.execute(
-                    f"MATCH (t:Thread {{name: '{thread_name}'}}), (ex:Exception {{id: '{ex_id}'}}) MERGE (t)-[:RAISED]->(ex)"
+                    f"MATCH (t:Thread {{name: '{thread_name_esc}'}}), (ex:Exception {{id: '{current_ex_id}'}}) MERGE (t)-[:RAISED]->(ex)"
                 )
 
+                # 스택트레이스 파싱
                 call_chain = []
                 j = i + 1
-                while j < len(lines) and (
-                    stack_pattern.match(lines[j])
-                    or lines[j].startswith("\t")
-                    or lines[j].startswith("   ")
-                ):
-                    stack_match = stack_pattern.match(lines[j])
-                    if stack_match:
+                while j < len(lines):
+                    s_line = lines[j]
+                    stack_match = stack_pattern.match(s_line)
+                    caused_match = caused_by_pattern.match(s_line)
+
+                    # Caused by 탐지 시 Root Cause Exception 노드 생성 및 관계 설정
+                    if caused_match:
+                        c_type, c_msg = caused_match.groups()
+                        caused_ex_id = f"caused_{j}_{int(time.time())}"
+                        c_type_esc = escape_cypher(c_type)
+                        c_msg_esc = escape_cypher(c_msg)
+
+                        conn.execute(
+                            f"MERGE (c_ex:Exception {{id: '{caused_ex_id}', type: '{c_type_esc}', message: '{c_msg_esc}', timestamp: timestamp('{clean_timestamp}')}})"
+                        )
+                        conn.execute(
+                            f"MATCH (parent:Exception {{id: '{current_ex_id}'}}), (child:Exception {{id: '{caused_ex_id}'}}) MERGE (parent)-[:CAUSED_BY]->(child)"
+                        )
+                        # Caused by 예외를 이후 스택 추적의 기준점으로 전환
+                        current_ex_id = caused_ex_id
+
+                    elif stack_match:
                         class_name, method_name, _, _ = stack_match.groups()
                         full_method = f"{class_name}.{method_name}"
                         call_chain.append((class_name, method_name, full_method))
-                    j += 1
-                    if len(call_chain) >= 5:
+
+                    elif (
+                        not s_line.startswith("\t")
+                        and not s_line.startswith("   ")
+                        and log_pattern.match(s_line)
+                    ):
                         break
 
-                if call_chain:
-                    root_class, root_method, root_full = call_chain[0]
-                    conn.execute(f"MERGE (c:Class {{name: '{root_class}'}})")
+                    j += 1
+                    if len(call_chain) >= 10:  # 깊이 제한 확장
+                        break
+
+                if call_chain and current_ex_id:
+                    # call_chain[0]은 예외가 직접 발생한 최하단 메서드
+                    occ_class, occ_method, occ_full = call_chain[0]
+                    occ_class_esc = escape_cypher(occ_class)
+                    occ_method_esc = escape_cypher(occ_method)
+                    occ_full_esc = escape_cypher(occ_full)
+
+                    conn.execute(f"MERGE (c:Class {{name: '{occ_class_esc}'}})")
                     conn.execute(
-                        f"MERGE (m:Method {{fullName: '{root_full}', name: '{root_method}'}})"
+                        f"MERGE (m:Method {{fullName: '{occ_full_esc}', name: '{occ_method_esc}'}})"
                     )
                     conn.execute(
-                        f"MATCH (m:Method {{fullName: '{root_full}'}}), (c:Class {{name: '{root_class}'}}) MERGE (m)-[:BELONGS_TO]->(c)"
+                        f"MATCH (m:Method {{fullName: '{occ_full_esc}'}}), (c:Class {{name: '{occ_class_esc}'}}) MERGE (m)-[:BELONGS_TO]->(c)"
                     )
                     conn.execute(
-                        f"MATCH (ex:Exception {{id: '{ex_id}'}}), (m:Method {{fullName: '{root_full}'}}) MERGE (ex)-[:OCCURRED_IN]->(m)"
+                        f"MATCH (ex:Exception {{id: '{current_ex_id}'}}), (m:Method {{fullName: '{occ_full_esc}'}}) MERGE (ex)-[:OCCURRED_IN]->(m)"
                     )
 
+                    # 상위 호출자 방향 정정 (call_chain[k+1]이 call_chain[k]를 호출함)
                     for k in range(len(call_chain) - 1):
-                        p_class, p_method, p_full = call_chain[k + 1]
-                        c_class, c_method, c_full = call_chain[k]
-                        conn.execute(f"MERGE (p_c:Class {{name: '{p_class}'}})")
+                        callee_class, callee_method, callee_full = call_chain[k]
+                        caller_class, caller_method, caller_full = call_chain[k + 1]
+
+                        caller_c_esc = escape_cypher(caller_class)
+                        caller_m_esc = escape_cypher(caller_method)
+                        caller_f_esc = escape_cypher(caller_full)
+
+                        callee_c_esc = escape_cypher(callee_class)
+                        callee_m_esc = escape_cypher(callee_method)
+                        callee_f_esc = escape_cypher(callee_full)
+
+                        conn.execute(f"MERGE (p_c:Class {{name: '{caller_c_esc}'}})")
                         conn.execute(
-                            f"MERGE (p_m:Method {{fullName: '{p_full}', name: '{p_method}'}})"
+                            f"MERGE (p_m:Method {{fullName: '{caller_f_esc}', name: '{caller_m_esc}'}})"
                         )
                         conn.execute(
-                            f"MATCH (p_m:Method {{fullName: '{p_full}'}}), (p_c:Class {{name: '{p_class}'}}) MERGE (p_m)-[:BELONGS_TO]->(p_c)"
-                        )
-                        conn.execute(
-                            f"MATCH (m1:Method {{fullName: '{p_full}'}}), (m2:Method {{fullName: '{c_full}'}}) MERGE (m1)-[:CALLS]->(m2)"
+                            f"MATCH (p_m:Method {{fullName: '{caller_f_esc}'}}), (p_c:Class {{name: '{caller_c_esc}'}}) MERGE (p_m)-[:BELONGS_TO]->(p_c)"
                         )
 
+                        conn.execute(
+                            f"MATCH (m_caller:Method {{fullName: '{caller_f_esc}'}}), (m_callee:Method {{fullName: '{callee_f_esc}'}}) MERGE (m_caller)-[:CALLS]->(m_callee)"
+                        )
+
+        # Worker 자원 해제
+        del conn
+        del db
+        gc.collect()
         self.finished.emit()
 
 
@@ -157,16 +210,22 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.init_database_safely()
 
+    def close_db_connection(self):
+        """Worker 스레드와의 Lock 충돌 방지를 위한 DB 연결 해제 함수"""
+        self.conn = None
+        self.db = None
+        gc.collect()
+        time.sleep(0.3)
+
     def init_database_safely(self):
         try:
             self.db = kuzu.Database(DB_PATH)
-            time.sleep(0.3)
+            time.sleep(0.2)
             self.conn = kuzu.Connection(self.db)
             self.create_schema_tables()
         except Exception as e:
-            print(f"초기 DB 생성 에러 재시도 시도: {e}")
-            gc.collect()
-            time.sleep(0.5)
+            print(f"DB 초기 연결 실패, 재시도: {e}")
+            self.close_db_connection()
             self.db = kuzu.Database(DB_PATH)
             self.conn = kuzu.Connection(self.db)
             self.create_schema_tables()
@@ -187,12 +246,16 @@ class MainWindow(QMainWindow):
             self.conn.execute(
                 "CREATE NODE TABLE IF NOT EXISTS Class(name STRING, PRIMARY KEY (name))"
             )
+
             self.conn.execute("CREATE REL TABLE IF NOT EXISTS RAISED(FROM Thread TO Exception)")
             self.conn.execute(
                 "CREATE REL TABLE IF NOT EXISTS OCCURRED_IN(FROM Exception TO Method)"
             )
             self.conn.execute("CREATE REL TABLE IF NOT EXISTS BELONGS_TO(FROM Method TO Class)")
             self.conn.execute("CREATE REL TABLE IF NOT EXISTS CALLS(FROM Method TO Method)")
+            self.conn.execute(
+                "CREATE REL TABLE IF NOT EXISTS CAUSED_BY(FROM Exception TO Exception)"
+            )
         except Exception as e:
             print(f"Schema 생성 정보: {e}")
 
@@ -205,10 +268,7 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.conn = None
-            self.db = None
-            gc.collect()
-            time.sleep(0.5)
+            self.close_db_connection()
 
             if os.path.exists(DB_PATH):
                 try:
@@ -283,7 +343,7 @@ class MainWindow(QMainWindow):
         self.table_root.setHorizontalHeaderLabels(
             ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
         )
-        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type: ignore
+        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_root.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table_root.itemClicked.connect(self.root_item_clicked)
         bottom_left_box.addWidget(self.table_root)
@@ -297,17 +357,13 @@ class MainWindow(QMainWindow):
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
         self.tree_view.setModel(self.tree_model)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type: ignore
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_right_box.addWidget(self.tree_view)
         bottom_layout.addLayout(bottom_right_box, 1)
 
         main_layout.addLayout(bottom_layout)
 
     def upload_log(self):
-        if not self.db:
-            QMessageBox.warning(self, "오류", "데이터베이스 초기화가 완료되지 않았습니다.")
-            return
-
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Spring Boot Log File", "", "Log Files (*.log *.out);;All Files (*)"
         )
@@ -315,11 +371,17 @@ class MainWindow(QMainWindow):
             self.btn_upload.setEnabled(False)
             self.btn_upload.setText("⏳ 자동 분석 중... 데이터 파싱 및 그래프 DB 모델링 처리 중")
 
-            self.worker = LogParseWorker(file_path, self.db)
+            # DB 파일 Lock 충돌을 방지하기 위해 UI 스레드의 DB 연결 해제
+            self.close_db_connection()
+
+            self.worker = LogParseWorker(file_path, DB_PATH)
             self.worker.finished.connect(self.on_parse_finished)
             self.worker.start()
 
     def on_parse_finished(self):
+        # Worker 파싱 완료 후 메인 스레드에서 DB 연결 재개
+        self.init_database_safely()
+
         self.btn_upload.setEnabled(True)
         self.btn_upload.setText("✅ 자동 분석 완료 (클릭하여 다시 분석)")
         self.lbl_status.setText("분석 프로세스가 정상 완료되었습니다.")
@@ -328,20 +390,21 @@ class MainWindow(QMainWindow):
     def run_auto_diagnosis(self):
         if not self.conn:
             return
+
         time_query = "MATCH (ex:Exception) RETURN Min(ex.timestamp) as start_time, Max(ex.timestamp) as end_time, Count(ex) as total_cnt"
         res = self.conn.execute(time_query)
-        if not res.has_next():  # type: ignore
+        if not res.has_next():
             self.txt_summary.setText("장애 데이터를 찾을 수 없습니다.")
             return
 
-        start_t, end_t, total_cnt = res.get_next()  # type: ignore
+        start_t, end_t, total_cnt = res.get_next()
         if total_cnt == 0:
             self.txt_summary.setText("분석된 Exception 로그가 존재하지 않습니다.")
             return
 
         thread_query = "MATCH (t:Thread) RETURN Count(t)"
         res_thread = self.conn.execute(thread_query)
-        total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0  # type: ignore
+        total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0
 
         db_cnt, net_cnt, auth_cnt, app_cnt = 0, 0, 0, 0
 
@@ -349,15 +412,22 @@ class MainWindow(QMainWindow):
         res_type = self.conn.execute(type_query)
         type_summary = ""
 
-        while res_type.has_next():  # type: ignore
-            ex_type, ex_msg, cnt = res_type.get_next()  # type: ignore
+        while res_type.has_next():
+            ex_type, ex_msg, cnt = res_type.get_next()
             type_summary += f"     > {ex_type} ({cnt}건)\n"
 
             if any(
                 k in ex_type or k in ex_msg
-                for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
+                for k in [
+                    "SQL",
+                    "Timeout",
+                    "Hikari",
+                    "Connection",
+                    "Deadlock",
+                    "Constraint",
+                ]
             ):
-                db_cnt += cnt  # type: ignore
+                db_cnt += cnt
             elif any(
                 k in ex_type or k in ex_msg
                 for k in [
@@ -370,7 +440,7 @@ class MainWindow(QMainWindow):
                     "SFTP",
                 ]
             ):
-                net_cnt += cnt  # type: ignore
+                net_cnt += cnt
             elif any(
                 k in ex_type or k in ex_msg
                 for k in [
@@ -382,13 +452,13 @@ class MainWindow(QMainWindow):
                     "AccessDenied",
                 ]
             ):
-                auth_cnt += cnt  # type: ignore
+                auth_cnt += cnt
             else:
-                app_cnt += cnt  # type: ignore
+                app_cnt += cnt
 
-        db_pct = int((db_cnt / total_cnt) * 100)  # type: ignore
-        net_pct = int((net_cnt / total_cnt) * 100)  # type: ignore
-        auth_pct = int((auth_cnt / total_cnt) * 100)  # type: ignore
+        db_pct = int((db_cnt / total_cnt) * 100)
+        net_pct = int((net_cnt / total_cnt) * 100)
+        auth_pct = int((auth_cnt / total_cnt) * 100)
         app_pct = max(0, 100 - (db_pct + net_pct + auth_pct))
 
         max_pct = max(db_pct, net_pct, auth_pct, app_pct)
@@ -451,8 +521,8 @@ class MainWindow(QMainWindow):
             all_errors_query = "MATCH (ex:Exception) RETURN STRING(ex.timestamp) as ts"
             all_errors_res = self.conn.execute(all_errors_query)
 
-            while all_errors_res.has_next():  # type: ignore
-                e_ts_str = all_errors_res.get_next()[0].split(".")[0]  # type: ignore
+            while all_errors_res.has_next():
+                e_ts_str = all_errors_res.get_next()[0].split(".")[0]
                 e_dt = datetime.strptime(e_ts_str, "%Y-%m-%d %H:%M:%S")
 
                 for iv in intervals:
@@ -501,8 +571,8 @@ class MainWindow(QMainWindow):
         res_root = self.conn.execute(root_query)
         self.table_root.setRowCount(0)
         row = 0
-        while res_root.has_next():  # type: ignore
-            cnt, method_name, ex_type = res_root.get_next()  # type: ignore
+        while res_root.has_next():
+            cnt, method_name, ex_type = res_root.get_next()
             self.table_root.insertRow(row)
             self.table_root.setItem(row, 0, QTableWidgetItem(str(cnt)))
             self.table_root.setItem(row, 1, QTableWidgetItem(method_name))
@@ -513,7 +583,7 @@ class MainWindow(QMainWindow):
         if not self.conn:
             return
         row = item.row()
-        target_method = self.table_root.item(row, 1).text()  # type: ignore
+        target_method = escape_cypher(self.table_root.item(row, 1).text())
         self.tree_model.clear()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
 
@@ -523,8 +593,8 @@ class MainWindow(QMainWindow):
         root_node = QStandardItem(f"🔥 근본 원인 메서드 (Root Method): {target_method}")
         self.tree_model.appendRow(root_node)
 
-        while res_tree.has_next():  # type: ignore
-            timestamp, full_name, ex_type, ex_msg = res_tree.get_next()  # type: ignore
+        while res_tree.has_next():
+            timestamp, full_name, ex_type, ex_msg = res_tree.get_next()
             time_str = (
                 str(timestamp).split(" ")[1].split(".")[0]
                 if " " in str(timestamp)
@@ -537,8 +607,8 @@ class MainWindow(QMainWindow):
 
             caller_query = f"MATCH (caller:Method)-[:CALLS]->(m:Method {{fullName: '{target_method}'}}) RETURN caller.fullName LIMIT 1"
             res_caller = self.conn.execute(caller_query)
-            if res_caller.has_next():  # type: ignore
-                caller_name = res_caller.get_next()[0]  # type: ignore
+            if res_caller.has_next():
+                caller_name = res_caller.get_next()[0]
                 caller_item = QStandardItem(f"    🔗 [상위 호출지점] {caller_name}")
                 error_detail_node.appendRow(caller_item)
 
