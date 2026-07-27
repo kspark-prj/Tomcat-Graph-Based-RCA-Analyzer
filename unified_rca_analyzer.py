@@ -634,7 +634,9 @@ class DiagnosisWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용)")
+        self.setWindowTitle(
+            "통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용) v1.1.0"
+        )
         self.setGeometry(100, 100, 1450, 950)
 
         self.db = None
