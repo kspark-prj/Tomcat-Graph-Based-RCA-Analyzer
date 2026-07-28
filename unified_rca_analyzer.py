@@ -460,12 +460,12 @@ class DiagnosisWorker(QThread):
 
             time_query = "MATCH (ex:Exception) RETURN Min(ex.timestamp) as start_time, Max(ex.timestamp) as end_time, Count(ex) as total_cnt"
             res = conn.execute(time_query)
-            if not res.has_next():
+            if not res.has_next():  # type:ignore
                 conn.close()
                 self.finished.emit("장애 데이터를 찾을 수 없습니다.", [], [], [])
                 return
 
-            start_t, end_t, total_cnt = res.get_next()
+            start_t, end_t, total_cnt = res.get_next()  # type:ignore
             if total_cnt == 0:
                 conn.close()
                 self.finished.emit("분석된 Exception 로그가 존재하지 않습니다.", [], [], [])
@@ -508,12 +508,12 @@ class DiagnosisWorker(QThread):
                             "e_time": step_e.strftime("%Y-%m-%d %H:%M:%S"),
                         },
                     )
-                    c_cnt = res_chart.get_next()[0] if res_chart.has_next() else 0
+                    c_cnt = res_chart.get_next()[0] if res_chart.has_next() else 0  # type:ignore
 
                     # 💡 핵심 개선: 날짜(07/26)를 완전히 제외하고 시:분(HH:MM~HH:MM)만 포맷팅하여 자릿수 절감
                     time_lbl = f"{step_s.strftime('%H:%M')}~{step_e.strftime('%H:%M')}"
 
-                    pct = int((c_cnt / total_cnt) * 100) if total_cnt > 0 else 0
+                    pct = int((c_cnt / total_cnt) * 100) if total_cnt > 0 else 0  # type:ignore
                     temp_data.append((step + 1, time_lbl, c_cnt, pct))
 
                 chart_10step_data = list(reversed(temp_data))
@@ -523,22 +523,22 @@ class DiagnosisWorker(QThread):
 
             thread_query = "MATCH (t:Thread) RETURN Count(t)"
             res_thread = conn.execute(thread_query)
-            total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0
+            total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0  # type:ignore
 
             db_cnt, net_cnt, auth_cnt, app_cnt = 0, 0, 0, 0
             type_query = "MATCH (ex:Exception) RETURN ex.type, ex.message, Count(ex) as cnt"
             res_type = conn.execute(type_query)
             type_summary = ""
 
-            while res_type.has_next():
-                ex_type, ex_msg, cnt = res_type.get_next()
+            while res_type.has_next():  # type:ignore
+                ex_type, ex_msg, cnt = res_type.get_next()  # type:ignore
                 type_summary += f"     > {ex_type} ({cnt}건)\n"
 
                 if any(
                     k in ex_type or k in ex_msg
                     for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
                 ):
-                    db_cnt += cnt
+                    db_cnt += cnt  # type:ignore
                 elif any(
                     k in ex_type or k in ex_msg
                     for k in [
@@ -550,7 +550,7 @@ class DiagnosisWorker(QThread):
                         "SFTP",
                     ]
                 ):
-                    net_cnt += cnt
+                    net_cnt += cnt  # type:ignore
                 elif any(
                     k in ex_type or k in ex_msg
                     for k in [
@@ -562,13 +562,13 @@ class DiagnosisWorker(QThread):
                         "AccessDenied",
                     ]
                 ):
-                    auth_cnt += cnt
+                    auth_cnt += cnt  # type:ignore
                 else:
-                    app_cnt += cnt
+                    app_cnt += cnt  # type:ignore
 
-            db_pct = int((db_cnt / total_cnt) * 100)
-            net_pct = int((net_cnt / total_cnt) * 100)
-            auth_pct = int((auth_cnt / total_cnt) * 100)
+            db_pct = int((db_cnt / total_cnt) * 100)  # type:ignore
+            net_pct = int((net_cnt / total_cnt) * 100)  # type:ignore
+            auth_pct = int((auth_cnt / total_cnt) * 100)  # type:ignore
             app_pct = max(0, 100 - (db_pct + net_pct + auth_pct))
 
             max_pct = max(db_pct, net_pct, auth_pct, app_pct)
@@ -609,15 +609,15 @@ class DiagnosisWorker(QThread):
             root_data = []
             root_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN Count(ex) as cnt, m.fullName, ex.type ORDER BY cnt DESC LIMIT 10"
             res_root = conn.execute(root_query)
-            while res_root.has_next():
-                cnt, method_name, ex_type = res_root.get_next()
+            while res_root.has_next():  # type:ignore
+                cnt, method_name, ex_type = res_root.get_next()  # type:ignore
                 root_data.append((str(cnt), method_name, ex_type))
 
             recent_data = []
             recent_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
             res_recent = conn.execute(recent_query)
-            while res_recent.has_next():
-                ts, method_name, ex_type = res_recent.get_next()
+            while res_recent.has_next():  # type:ignore
+                ts, method_name, ex_type = res_recent.get_next()  # type:ignore
                 time_str = str(ts).split(".")[0]
                 recent_data.append((time_str, method_name, ex_type))
 
@@ -855,7 +855,7 @@ class MainWindow(QMainWindow):
         self.table_root.setHorizontalHeaderLabels(
             ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
         )
-        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
         bottom_left_box.addWidget(self.table_root, 1)
 
         bottom_left_box.addWidget(QLabel("<b>🚨 최근 시간대별 에러 코드 랭킹 (최근 발생 순)</b>"))
@@ -863,7 +863,7 @@ class MainWindow(QMainWindow):
         self.table_recent.setHorizontalHeaderLabels(
             ["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"]
         )
-        self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
         bottom_left_box.addWidget(self.table_recent, 1)
 
         bottom_layout.addLayout(bottom_left_box, 1)
@@ -876,7 +876,7 @@ class MainWindow(QMainWindow):
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
         self.tree_view.setModel(self.tree_model)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
         bottom_right_box.addWidget(self.tree_view)
         bottom_layout.addLayout(bottom_right_box, 1)
 
@@ -910,12 +910,12 @@ class MainWindow(QMainWindow):
             RETURN ex.id, ex.type, ex.message, ex.stackTrace, ex.timestamp
             ORDER BY ex.timestamp DESC LIMIT 5
             """
-            res_ex = self.conn.execute(ex_query, {"method_name": method_name})
+            res_ex = self.conn.execute(ex_query, {"method_name": method_name})  # type:ignore
 
             has_data = False
-            while res_ex.has_next():
+            while res_ex.has_next():  # type:ignore
                 has_data = True
-                ex_id, ex_type, ex_msg, stack_trace, ts = res_ex.get_next()
+                ex_id, ex_type, ex_msg, stack_trace, ts = res_ex.get_next()  # type:ignore
 
                 ex_item = QStandardItem(f"🚨 [{str(ts).split('.')[0]}] {ex_type}: {ex_msg}")
 
@@ -923,9 +923,9 @@ class MainWindow(QMainWindow):
                 MATCH (ex:Exception {id: $ex_id})-[:CAUSED_BY]->(child:Exception)
                 RETURN child.type, child.message
                 """
-                res_cb = self.conn.execute(cb_query, {"ex_id": ex_id})
-                while res_cb.has_next():
-                    c_type, c_msg = res_cb.get_next()
+                res_cb = self.conn.execute(cb_query, {"ex_id": ex_id})  # type:ignore
+                while res_cb.has_next():  # type:ignore
+                    c_type, c_msg = res_cb.get_next()  # type:ignore
                     ex_item.appendRow(QStandardItem(f"  └─ 💥 Caused by: {c_type}: {c_msg}"))
 
                 if stack_trace:
@@ -946,9 +946,9 @@ class MainWindow(QMainWindow):
             RETURN DISTINCT caller.fullName
             LIMIT 5
             """
-            res_calls = self.conn.execute(calls_query, {"method_name": method_name})
-            while res_calls.has_next():
-                caller_full = res_calls.get_next()[0]
+            res_calls = self.conn.execute(calls_query, {"method_name": method_name})  # type:ignore
+            while res_calls.has_next():  # type:ignore
+                caller_full = res_calls.get_next()[0]  # type:ignore
                 root_node.appendRow(QStandardItem(f"  ⬆️ Called By: {caller_full}"))
 
             self.tree_model.appendRow(root_node)
