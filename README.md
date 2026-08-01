@@ -84,6 +84,11 @@ pip install PyQt6 kuzu pyarrow
 
 ```
 
+```bash
+# 단일 바이너리 빌드
+pyinstaller -w -F --icon=main.ico unified_rca_analyzer.py
+```
+
 ### 2. 프로젝트 실행
 
 구동 환경이 준비되면 메인 스크립트를 실행합니다.
