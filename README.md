@@ -86,7 +86,7 @@ pip install PyQt6 kuzu pyarrow
 
 ```bash
 # 단일 바이너리 빌드
-pyinstaller -w -F --icon=main.ico unified_rca_analyzer.py
+pyinstaller -w -F --icon=main.ico --exclude-module PIL --exclude-module Pillow  unified_rca_analyzer.py
 ```
 
 ### 2. 프로젝트 실행
