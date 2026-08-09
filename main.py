@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 
 import kuzu
 import pyarrow as pa
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QStandardItem, QStandardItemModel
+from PyQt6.QtCore import QSize, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSplashScreen,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -33,6 +34,131 @@ from PyQt6.QtWidgets import (
 DB_PATH = "./kuzu_unified_log_db"
 
 
+# ==============================================================================
+# 1. 커스텀 스플래시 윈도우 (이미지 + 하단 프로그레스 바)
+# ==============================================================================
+class CustomSplashScreen(QWidget):
+    def __init__(self, image_path="splash.png"):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 이미지와 하단 프로그레스바를 감쌀 프레임
+        container = QFrame()
+        container.setStyleSheet(
+            """
+            QFrame {
+                background-color: #0d131d;
+                border: 1px solid #1a2638;
+                border-radius: 12px;
+            }
+        """
+        )
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(10, 10, 10, 15)
+        container_layout.setSpacing(10)
+
+        # 이미지 표시 라벨
+        self.lbl_image = QLabel()
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            # 스플래시 해상도에 맞게 스케일링
+            self.lbl_image.setPixmap(
+                pixmap.scaled(
+                    720,
+                    405,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        else:
+            self.lbl_image.setText("DATA INSIGHT ANALYTICS\n데이터 인사이트 분석")
+            self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_image.setStyleSheet(
+                "color: #00d2d3; font-size: 24px; font-weight: bold; min-height: 300px;"
+            )
+
+        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(self.lbl_image)
+
+        # 상태 메시지 라벨
+        self.lbl_status = QLabel("시스템 초기화 진행 중...")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_status.setStyleSheet(
+            "color: #8c9ba5; font-size: 12px; font-weight: bold; background: transparent; border: none;"
+        )
+        container_layout.addWidget(self.lbl_status)
+
+        # 하단 프로그레스 바
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet(
+            """
+            QProgressBar {
+                background-color: #1a2433;
+                border: none;
+                border-radius: 4px;
+            }
+            QProgressBar::chunk {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0052d4, stop:0.5 #4364f7, stop:1 #6fb1fc);
+                border-radius: 4px;
+            }
+        """
+        )
+        container_layout.addWidget(self.progress_bar)
+
+        main_layout.addWidget(container)
+        self.adjustSize()
+
+        # 화면 중앙 배치
+        screen = QApplication.primaryScreen().geometry()
+        size = self.geometry()
+        self.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
+
+    def update_progress(self, message, value):
+        self.lbl_status.setText(message)
+        self.progress_bar.setValue(value)
+
+
+# ==============================================================================
+# 2. 메인 초기화 작업 백그라운드 워커 Thread
+# ==============================================================================
+class InitWorker(QThread):
+    progress = pyqtSignal(str, int)
+    finished = pyqtSignal()
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+
+    def run(self):
+        self.progress.emit("데이터베이스 연결 준비 중...", 20)
+        time.sleep(0.3)
+
+        self.progress.emit("데이터베이스 스키마 검증 및 연결...", 50)
+        self.main_window.init_database_safely()
+        time.sleep(0.3)
+
+        self.progress.emit("사용자 인터페이스 구성 요소 로딩 중...", 80)
+        time.sleep(0.2)
+
+        self.progress.emit("초기화 완료!", 100)
+        time.sleep(0.2)
+
+        self.finished.emit()
+
+
+# ==============================================================================
+# 3. 데이터베이스 및 헬퍼 함수
+# ==============================================================================
 def parse_clean_timestamp(ts_str: str) -> str:
     if not ts_str:
         return "1970-01-01 00:00:00"
@@ -58,6 +184,9 @@ def create_schema(conn):
     conn.execute("CREATE REL TABLE IF NOT EXISTS CAUSED_BY(FROM Exception TO Exception)")
 
 
+# ==============================================================================
+# 4. 로그 파싱 및 진단 워커 Thread
+# ==============================================================================
 class LogParseWorker(QThread):
     progress = pyqtSignal(str, int)
     pattern_detected = pyqtSignal(str)
@@ -471,7 +600,6 @@ class DiagnosisWorker(QThread):
                 self.finished.emit("분석된 Exception 로그가 존재하지 않습니다.", [], [], [])
                 return
 
-            # --- 10단계 시간대별 발생 현황 ---
             chart_10step_data = []
             try:
                 dt_start = (
@@ -510,7 +638,6 @@ class DiagnosisWorker(QThread):
                     )
                     c_cnt = res_chart.get_next()[0] if res_chart.has_next() else 0  # type:ignore
 
-                    # 💡 핵심 개선: 날짜(07/26)를 완전히 제외하고 시:분(HH:MM~HH:MM)만 포맷팅하여 자릿수 절감
                     time_lbl = f"{step_s.strftime('%H:%M')}~{step_e.strftime('%H:%M')}"
 
                     pct = int((c_cnt / total_cnt) * 100) if total_cnt > 0 else 0  # type:ignore
@@ -631,6 +758,9 @@ class DiagnosisWorker(QThread):
             self.finished.emit(f"진단 중 오류 발생: {e}", [], [], [])
 
 
+# ==============================================================================
+# 5. 메인 윈도우 클래스
+# ==============================================================================
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -643,7 +773,6 @@ class MainWindow(QMainWindow):
         self.conn = None
 
         self.setup_ui()
-        self.init_database_safely()
 
     def close_db_connection(self):
         if self.conn:
@@ -759,7 +888,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setTextVisible(False)
         main_layout.addWidget(self.progress_bar)
 
-        # 1. 보고서 요약 영역
         top_report_box = QVBoxLayout()
         top_report_box.setSpacing(2)
         top_report_box.setContentsMargins(0, 0, 0, 0)
@@ -779,7 +907,6 @@ class MainWindow(QMainWindow):
         top_report_box.addWidget(self.txt_summary)
         main_layout.addLayout(top_report_box)
 
-        # 2. 10단계 시간대별 발생 현황 차트 레이아웃 (자릿수 잘림 완벽 해결 적용)
         chart_group = QVBoxLayout()
         chart_group.setSpacing(2)
 
@@ -809,12 +936,10 @@ class MainWindow(QMainWindow):
             cell_box.setContentsMargins(0, 0, 0, 0)
             cell_box.setSpacing(2)
 
-            # 1) 시간 라벨: "T10: 16:05~16:08" 형태에 맞춰 92px로 슬림하게 조정
             time_lbl = QLabel(f"T{10 - i}: --:--~--:--")
             time_lbl.setStyleSheet("color: #00d2d3; font-weight: bold; font-size: 10px;")
             time_lbl.setFixedWidth(92)
 
-            # 2) 프로그래스 바 (막대 차트): 넉넉한 공간을 가변적으로 점유
             p_bar = QProgressBar()
             p_bar.setFixedHeight(10)
             p_bar.setMinimumWidth(20)
@@ -826,7 +951,6 @@ class MainWindow(QMainWindow):
             """
             )
 
-            # 3) 건수 및 비율 라벨
             val_lbl = QLabel("0건 (0%)")
             val_lbl.setStyleSheet("color: #dcdde1; font-size: 10px;")
             val_lbl.setFixedWidth(52)
@@ -844,7 +968,6 @@ class MainWindow(QMainWindow):
         chart_group.addWidget(chart_frame)
         main_layout.addLayout(chart_group)
 
-        # 3. 하단 그리드 및 파급 효과 창
         bottom_layout = QHBoxLayout()
 
         bottom_left_box = QVBoxLayout()
@@ -1023,7 +1146,6 @@ class MainWindow(QMainWindow):
 
         self.txt_summary.setText(report)
 
-        # 10단계 차트 바인딩
         if chart_data:
             for idx, (step_num, time_lbl, cnt, pct) in enumerate(chart_data):
                 if idx < len(self.chart_bars):
@@ -1047,8 +1169,34 @@ class MainWindow(QMainWindow):
             self.table_recent.setItem(row, 2, QTableWidgetItem(ex_type))
 
 
+# ==============================================================================
+# 6. 애플리케이션 실행 진입점 (Main)
+# ==============================================================================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
+
+    # 1) 커스텀 스플래시 화면 생성 및 표출
+    splash = CustomSplashScreen("splash.png")
+    splash.show()
+
+    # 2) 메인 윈도우 인스턴스 생성
+    main_window = MainWindow()
+
+    # 3) 비동기로 초기화 작업을 진행할 백그라운드 스레드 생성
+    init_worker = InitWorker(main_window)
+    init_worker.progress.connect(splash.update_progress)
+
+    def on_init_finished():
+        # 1. 메인 윈도우를 먼저 화면에 출력
+        main_window.show()
+
+        # 2. 메인 윈도우가 완전히 그려지고 렌더링 이벤트를 처리할 수 있도록 동기화
+        QApplication.processEvents()
+
+        # 3. 메인 윈도우가 뜬 후 스플래시 창을 완전히 닫음
+        splash.close()
+
+    init_worker.finished.connect(on_init_finished)
+    init_worker.start()
+
     sys.exit(app.exec())
