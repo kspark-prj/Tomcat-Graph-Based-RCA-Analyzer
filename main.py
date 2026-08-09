@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QSplashScreen,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -30,6 +29,12 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+# PyInstaller 네이티브 스플래시 라이브러리 모듈 임포트 시도
+try:
+    import pyi_splash
+except ImportError:
+    pyi_splash = None
 
 DB_PATH = "./kuzu_unified_log_db"
 
@@ -66,7 +71,7 @@ def get_resource_path(relative_path):
 
 
 # ==============================================================================
-# 1. 커스텀 스플래시 윈도우 (이미지 + 하단 프로그레스 바)
+# 1. 커스텀 스플래시 윈도우 (원본 비율 유지 및 독립 하단 프레임 적용)
 # ==============================================================================
 class CustomSplashScreen(QWidget):
     def __init__(self, image_path="splash.png"):
@@ -80,84 +85,110 @@ class CustomSplashScreen(QWidget):
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        # 이미지와 하단 프로그레스바를 감쌀 프레임
+        # 외곽 컨테이너 프레임
         container = QFrame()
+        container.setObjectName("SplashContainer")
         container.setStyleSheet(
             """
-            QFrame {
+            QFrame#SplashContainer {
                 background-color: #0d131d;
-                border: 1px solid #1a2638;
-                border-radius: 12px;
+                border: 1px solid #2a2b2d;
+                border-radius: 8px;
             }
         """
         )
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 15)
+        container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
 
-        # 이미지 표시 라벨
+        # ----------------------------------------------------------------------
+        # ① 상단 영역: 이미지 배치 (원본 비율 보존)
+        # ----------------------------------------------------------------------
         self.lbl_image = QLabel()
+        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # 동적 절대 경로 탐색
         real_image_path = get_resource_path(image_path)
         pixmap = QPixmap(real_image_path)
 
-        # 파일이 존재하고 QPixmap이 정상 로드되었는지 검증
+        target_width = 600
+        bottom_frame_height = 60  # 하단 독립 프레임 고정 높이
+
         if os.path.exists(real_image_path) and not pixmap.isNull():
-            # 스플래시 해상도에 맞게 스케일링
-            self.lbl_image.setPixmap(
-                pixmap.scaled(
-                    600,
-                    350,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
+            # 비율을 유지하면서 가로 600px에 맞게 변환 (세로 왜곡 방지)
+            scaled_pixmap = pixmap.scaledToWidth(
+                target_width, Qt.TransformationMode.SmoothTransformation
             )
+            img_height = scaled_pixmap.height()
+            self.lbl_image.setPixmap(scaled_pixmap)
         else:
+            # 이미지 부재 시 대체 UI
+            img_height = 340
             self.lbl_image.setText("DATA INSIGHT ANALYTICS\n데이터 인사이트 분석")
-            self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lbl_image.setStyleSheet(
-                "color: #00d2d3; font-size: 24px; font-weight: bold; min-height: 300px;"
+                "color: #00d2d3; font-size: 22px; font-weight: bold; background-color: #0d131d;"
             )
 
-        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_image.setFixedHeight(img_height)
         container_layout.addWidget(self.lbl_image)
+
+        # ----------------------------------------------------------------------
+        # ② 하단 영역: 독립된 프레임 (#18191A) - 텍스트 및 프로그래스 바
+        # ----------------------------------------------------------------------
+        bottom_frame = QFrame()
+        bottom_frame.setFixedHeight(bottom_frame_height)
+        bottom_frame.setStyleSheet(
+            """
+            QFrame {
+                background-color: #18191A;
+                border-top: 1px solid #28292a;
+                border-bottom-left-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+        """
+        )
+        bottom_layout = QVBoxLayout(bottom_frame)
+        bottom_layout.setContentsMargins(20, 10, 20, 12)
+        bottom_layout.setSpacing(6)
 
         # 상태 메시지 라벨
         self.lbl_status = QLabel("시스템 초기화 진행 중...")
-        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_status.setStyleSheet(
-            "color: #8c9ba5; font-size: 12px; font-weight: bold; background: transparent; border: none;"
+            "color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;"
         )
-        container_layout.addWidget(self.lbl_status)
+        bottom_layout.addWidget(self.lbl_status)
 
         # 하단 프로그레스 바
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setFixedHeight(6)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet(
             """
             QProgressBar {
-                background-color: #1a2433;
+                background-color: #2a2d32;
                 border: none;
-                border-radius: 4px;
+                border-radius: 3px;
             }
             QProgressBar::chunk {
                 background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0052d4, stop:0.5 #4364f7, stop:1 #6fb1fc);
-                border-radius: 4px;
+                border-radius: 3px;
             }
         """
         )
-        container_layout.addWidget(self.progress_bar)
+        bottom_layout.addWidget(self.progress_bar)
 
+        container_layout.addWidget(bottom_frame)
         main_layout.addWidget(container)
-        self.adjustSize()
 
-        # 화면 중앙 배치
+        # 전체 스플래시 창 크기 = [이미지 높이] + [하단 프레임 높이]
+        total_height = img_height + bottom_frame_height
+        self.setFixedSize(target_width, total_height)
+
+        # 화면 중앙에 정렬
         screen = QApplication.primaryScreen().geometry()
-        size = self.geometry()
-        self.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
+        self.move((screen.width() - target_width) // 2, (screen.height() - total_height) // 2)
 
     def update_progress(self, message, value):
         self.lbl_status.setText(message)
@@ -1206,33 +1237,44 @@ class MainWindow(QMainWindow):
 
 
 # ==============================================================================
-# 6. 애플리케이션 실행 진입점 (Main)
+# 6. 애플리케이션 실행 진입점 (DBeaver 스타일 Zero-Flicker 처리 적용)
 # ==============================================================================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # 1) 커스텀 스플래시 화면 생성 및 표출
+    # 1. 커스텀 스플래시 생성 및 먼저 표출
     splash = CustomSplashScreen("splash.png")
     splash.show()
+    QApplication.processEvents()  # UI 즉시 렌더링 동기화
 
-    # 2) 메인 윈도우 인스턴스 생성
+    # 2. PyQt6 스플래시가 화면을 가린 직후 PyInstaller 네이티브 스플래시 닫기
+    if pyi_splash and pyi_splash.is_alive():
+        pyi_splash.close()
+
+    # 3. 메인 윈도우 인스턴스 생성 (숨김 상태 유지)
     main_window = MainWindow()
 
-    # 3) 비동기로 초기화 작업을 진행할 백그라운드 스레드 생성
+    # 4. 백그라운드 초기화 스레드 생성 및 바인딩
     init_worker = InitWorker(main_window)
     init_worker.progress.connect(splash.update_progress)
 
-    def on_init_finished():
-        # 1. 메인 윈도우를 먼저 화면에 출력
+    def _finish_loading():
+        # [Double Buffering Zero-Flicker 파이프라인]
+        # ① 메인 윈도우를 스플래시 뒤편에 먼저 띄움
         main_window.show()
 
-        # 2. 메인 윈도우가 완전히 그려지고 렌더링 이벤트를 처리할 수 있도록 동기화
+        # ② OS 수준에서 메인 UI 렌더링 강제 실행 및 동기화 (Flicker 완전 차단)
         QApplication.processEvents()
 
-        # 3. 메인 윈도우가 뜬 후 스플래시 창을 완전히 닫음
+        # ③ 메인 창 렌더링 직후 상단의 PyQt6 스플래시 제거
         splash.close()
+        splash.deleteLater()
 
-    init_worker.finished.connect(on_init_finished)
+        # ④ 메인 윈도우 포커스 강제 지정
+        main_window.raise_()
+        main_window.activateWindow()
+
+    init_worker.finished.connect(_finish_loading)
     init_worker.start()
 
     sys.exit(app.exec())
