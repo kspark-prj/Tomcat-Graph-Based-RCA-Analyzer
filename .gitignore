@@ -7,9 +7,6 @@ __pycache__/
 *.wal
 kuzu_unified_log_db
 
-# Rust build artifacts
-large_file_core/target/
-
 # PyInstaller build artifacts
 build/
 dist/
@@ -18,8 +15,6 @@ dist/
 *.pyd
 *.so
 
-# Maturin wheels
-large_file_core/target/wheels/
 
 # IDE / Editor
 .vscode/

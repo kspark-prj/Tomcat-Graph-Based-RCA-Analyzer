@@ -35,6 +35,37 @@ DB_PATH = "./kuzu_unified_log_db"
 
 
 # ==============================================================================
+# 0. PyInstaller 동적 경로 탐색 헬퍼 함수
+# ==============================================================================
+def get_resource_path(relative_path):
+    """
+    PyInstaller 동결(frozen) 환경과 일반 개발 환경 경로를 통합 처리하는 함수
+    """
+    if getattr(sys, "frozen", False):
+        exe_dir = os.path.dirname(sys.executable)
+
+        # 1. sys._MEIPASS 임시 디렉터리 확인 (PyInstaller 내부 경로)
+        if hasattr(sys, "_MEIPASS"):
+            p = os.path.join(sys._MEIPASS, relative_path)
+            if os.path.exists(p):
+                return p
+
+        # 2. PyInstaller v6+ onedir 빌드 시 _internal 폴더 확인
+        p_internal = os.path.join(exe_dir, "_internal", relative_path)
+        if os.path.exists(p_internal):
+            return p_internal
+
+        # 3. main.exe 실행 파일과 같은 위치의 루트 폴더 확인
+        p_exe = os.path.join(exe_dir, relative_path)
+        if os.path.exists(p_exe):
+            return p_exe
+
+    # 일반 파이썬 script 실행 환경
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+
+# ==============================================================================
 # 1. 커스텀 스플래시 윈도우 (이미지 + 하단 프로그레스 바)
 # ==============================================================================
 class CustomSplashScreen(QWidget):
@@ -67,8 +98,13 @@ class CustomSplashScreen(QWidget):
 
         # 이미지 표시 라벨
         self.lbl_image = QLabel()
-        if os.path.exists(image_path):
-            pixmap = QPixmap(image_path)
+
+        # 동적 절대 경로 탐색
+        real_image_path = get_resource_path(image_path)
+        pixmap = QPixmap(real_image_path)
+
+        # 파일이 존재하고 QPixmap이 정상 로드되었는지 검증
+        if os.path.exists(real_image_path) and not pixmap.isNull():
             # 스플래시 해상도에 맞게 스케일링
             self.lbl_image.setPixmap(
                 pixmap.scaled(
