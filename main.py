@@ -93,8 +93,8 @@ class CustomSplashScreen(QWidget):
         """
         )
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(10, 10, 10, 15)
-        container_layout.setSpacing(10)
+        container_layout.setContentsMargins(0, 0, 0, 15)
+        container_layout.setSpacing(0)
 
         # 이미지 표시 라벨
         self.lbl_image = QLabel()
@@ -108,8 +108,8 @@ class CustomSplashScreen(QWidget):
             # 스플래시 해상도에 맞게 스케일링
             self.lbl_image.setPixmap(
                 pixmap.scaled(
-                    720,
-                    405,
+                    600,
+                    350,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
