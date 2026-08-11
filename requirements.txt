@@ -1,4 +1,15 @@
-PyQt6==6.7.1
-pyinstaller==6.21.0
-kuzu==0.11.3
+# GUI Framework
+PyQt6>=6.7.1,<7.0.0
+
+# Executable Packaging & Bundling
+pyinstaller>=6.21.0,<7.0.0
+
+# Graph Database Engine
+kuzu>=0.11.3,<1.0.0
+
+# Data Processing & Columnar Memory
 pyarrow>=17.0.0
+
+# HTTP & Network Utilities
+urllib3>=2.2.0,<3.0.0
+requests>=2.31.0,<3.0.0  # GitHub API 및 외부 HTTP 통신용 (urllib3 의존성)
