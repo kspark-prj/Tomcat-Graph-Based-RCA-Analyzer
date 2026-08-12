@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 
 import kuzu
 import pyarrow as pa
-from PyQt6.QtCore import QSize, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QFileDialog,
     QFrame,
@@ -42,10 +43,8 @@ DB_PATH = "./kuzu_unified_log_db"
 # ==============================================================================
 # 0. PyInstaller 동적 경로 탐색 헬퍼 함수
 # ==============================================================================
-def get_resource_path(relative_path):
-    """
-    PyInstaller 동결(frozen) 환경과 일반 개발 환경 경로를 통합 처리하는 함수
-    """
+def get_resource_path(relative_path: str) -> str:
+    """PyInstaller 동결(frozen) 환경과 일반 개발 환경 경로를 통합 처리하는 함수"""
     if getattr(sys, "frozen", False):
         exe_dir = os.path.dirname(sys.executable)
 
@@ -70,11 +69,29 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def safe_remove_db_path(path: str, retries: int = 3, delay: float = 0.2):
+    """DB 폴더/파일 안전 삭제 헬퍼 함수 (파일 잠금 해제 지연 대응)"""
+    if not os.path.exists(path):
+        return
+
+    for i in range(retries):
+        try:
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+            break
+        except Exception as e:
+            if i == retries - 1:
+                print(f"[Warning] DB 경로 삭제 실패 ({path}): {e}")
+            time.sleep(delay)
+
+
 # ==============================================================================
-# 1. 커스텀 스플래시 윈도우 (원본 비율 유지 및 독립 하단 프레임 적용)
+# 1. 커스텀 스플래시 윈도우 (단일 배경 이미지 및 하단 위젯 오버레이 적용)
 # ==============================================================================
 class CustomSplashScreen(QWidget):
-    def __init__(self, image_path="splash.png"):
+    def __init__(self, image_path: str = "splash.png"):
         super().__init__()
         self.setWindowFlags(
             Qt.WindowType.Window
@@ -83,76 +100,43 @@ class CustomSplashScreen(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        # 창 크기 600x410 고정 (크기 변화 및 깜빡임 차단)
+        target_width = 600
+        target_height = 410
+        self.setFixedSize(target_width, target_height)
 
-        # 외곽 컨테이너 프레임
-        container = QFrame()
-        container.setObjectName("SplashContainer")
-        container.setStyleSheet(
-            """
-            QFrame#SplashContainer {
-                background-color: #0d131d;
-                border: 1px solid #2a2b2d;
-                border-radius: 8px;
-            }
-        """
-        )
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(0)
-
-        # ----------------------------------------------------------------------
-        # ① 상단 영역: 이미지 배치 (원본 비율 보존)
-        # ----------------------------------------------------------------------
-        self.lbl_image = QLabel()
-        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # ① 전체 창 크기와 동일한 단일 배경 이미지 렌더링 QLabel
+        self.lbl_bg = QLabel(self)
+        self.lbl_bg.setGeometry(0, 0, target_width, target_height)
 
         real_image_path = get_resource_path(image_path)
         pixmap = QPixmap(real_image_path)
 
-        target_width = 600
-        bottom_frame_height = 60  # 하단 독립 프레임 고정 높이
-
         if os.path.exists(real_image_path) and not pixmap.isNull():
-            # 비율을 유지하면서 가로 600px에 맞게 변환 (세로 왜곡 방지)
-            scaled_pixmap = pixmap.scaledToWidth(
-                target_width, Qt.TransformationMode.SmoothTransformation
+            scaled_pixmap = pixmap.scaled(
+                target_width,
+                target_height,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
-            img_height = scaled_pixmap.height()
-            self.lbl_image.setPixmap(scaled_pixmap)
+            self.lbl_bg.setPixmap(scaled_pixmap)
         else:
-            # 이미지 부재 시 대체 UI
-            img_height = 340
-            self.lbl_image.setText("DATA INSIGHT ANALYTICS\n데이터 인사이트 분석")
-            self.lbl_image.setStyleSheet(
-                "color: #00d2d3; font-size: 22px; font-weight: bold; background-color: #0d131d;"
+            self.lbl_bg.setText("DATA INSIGHT ANALYTICS\n데이터 인사이트 분석")
+            self.lbl_bg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_bg.setStyleSheet(
+                "color: #00d2d3; font-size: 22px; font-weight: bold; background-color: #0d131d; border: 1px solid #2a2b2d; border-radius: 8px;"
             )
 
-        self.lbl_image.setFixedHeight(img_height)
-        container_layout.addWidget(self.lbl_image)
+        # ② 하단 60px 공간 위에 상태 안내 텍스트와 프로그래스 바 오버레이(Overlay) 배치
+        bottom_height = 60
+        bottom_container = QWidget(self)
+        bottom_container.setGeometry(0, target_height - bottom_height, target_width, bottom_height)
+        bottom_container.setStyleSheet("background: transparent;")
 
-        # ----------------------------------------------------------------------
-        # ② 하단 영역: 독립된 프레임 (#18191A) - 텍스트 및 프로그래스 바
-        # ----------------------------------------------------------------------
-        bottom_frame = QFrame()
-        bottom_frame.setFixedHeight(bottom_frame_height)
-        bottom_frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: #18191A;
-                border-top: 1px solid #28292a;
-                border-bottom-left-radius: 8px;
-                border-bottom-right-radius: 8px;
-            }
-        """
-        )
-        bottom_layout = QVBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(20, 10, 20, 12)
-        bottom_layout.setSpacing(6)
+        bottom_layout = QVBoxLayout(bottom_container)
+        bottom_layout.setContentsMargins(20, 6, 20, 10)
+        bottom_layout.setSpacing(4)
 
-        # 상태 메시지 라벨
         self.lbl_status = QLabel("시스템 초기화 진행 중...")
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_status.setStyleSheet(
@@ -160,7 +144,6 @@ class CustomSplashScreen(QWidget):
         )
         bottom_layout.addWidget(self.lbl_status)
 
-        # 하단 프로그레스 바
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(6)
         self.progress_bar.setTextVisible(False)
@@ -179,18 +162,10 @@ class CustomSplashScreen(QWidget):
         )
         bottom_layout.addWidget(self.progress_bar)
 
-        container_layout.addWidget(bottom_frame)
-        main_layout.addWidget(container)
-
-        # 전체 스플래시 창 크기 = [이미지 높이] + [하단 프레임 높이]
-        total_height = img_height + bottom_frame_height
-        self.setFixedSize(target_width, total_height)
-
-        # 화면 중앙에 정렬
         screen = QApplication.primaryScreen().geometry()
-        self.move((screen.width() - target_width) // 2, (screen.height() - total_height) // 2)
+        self.move((screen.width() - target_width) // 2, (screen.height() - target_height) // 2)
 
-    def update_progress(self, message, value):
+    def update_progress(self, message: str, value: int):
         self.lbl_status.setText(message)
         self.progress_bar.setValue(value)
 
@@ -208,17 +183,26 @@ class InitWorker(QThread):
 
     def run(self):
         self.progress.emit("데이터베이스 연결 준비 중...", 20)
-        time.sleep(0.3)
+        time.sleep(0.2)
 
         self.progress.emit("데이터베이스 스키마 검증 및 연결...", 50)
-        self.main_window.init_database_safely()
-        time.sleep(0.3)
+        try:
+            db = kuzu.Database(DB_PATH)
+            conn = kuzu.Connection(db)
+            create_schema(conn)
+            conn.close()
+            if hasattr(db, "close"):
+                db.close()
+            del conn, db
+            gc.collect()
+        except Exception as e:
+            print(f"초기화 DB 스키마 생성 중 예외 발생: {e}")
 
         self.progress.emit("사용자 인터페이스 구성 요소 로딩 중...", 80)
         time.sleep(0.2)
 
         self.progress.emit("초기화 완료!", 100)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         self.finished.emit()
 
@@ -234,7 +218,7 @@ def parse_clean_timestamp(ts_str: str) -> str:
     return ts
 
 
-def create_schema(conn):
+def create_schema(conn: kuzu.Connection):
     conn.execute("CREATE NODE TABLE IF NOT EXISTS Thread(name STRING, PRIMARY KEY (name))")
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS Exception(id STRING, type STRING, message STRING, stackTrace STRING, timestamp TIMESTAMP, PRIMARY KEY (id))"
@@ -259,21 +243,14 @@ class LogParseWorker(QThread):
     pattern_detected = pyqtSignal(str)
     finished = pyqtSignal(bool, int)
 
-    def __init__(self, file_path, db_path):
+    def __init__(self, file_path: str, db_path: str):
         super().__init__()
         self.file_path = file_path
         self.db_path = db_path
 
     def run(self):
         self.progress.emit("기존 DB 데이터 자동 초기화 중...", 3)
-        if os.path.exists(self.db_path):
-            try:
-                if os.path.isdir(self.db_path):
-                    shutil.rmtree(self.db_path)
-                else:
-                    os.remove(self.db_path)
-            except Exception as e:
-                print(f"자동 DB 초기화 중 파일 삭제 실패: {e}")
+        safe_remove_db_path(self.db_path)
 
         self.progress.emit("신규 데이터베이스 스키마 구성 중...", 7)
         try:
@@ -330,6 +307,7 @@ class LogParseWorker(QThread):
         FRAMEWORK_PACKAGES = (
             "java.",
             "javax.",
+            "jakarta.",
             "org.springframework.",
             "org.apache.",
             "com.zaxxer.",
@@ -365,6 +343,8 @@ class LogParseWorker(QThread):
 
         if not detected_pattern:
             conn.close()
+            if hasattr(db, "close"):
+                db.close()
             del conn, db
             gc.collect()
             self.finished.emit(False, 0)
@@ -454,7 +434,7 @@ class LogParseWorker(QThread):
 
                 if line_idx % 5000 == 0:
                     percent = int(12 + (bytes_read / file_size) * 73)
-                    self.progress.emit(f"로그 파싱 중... ({line_idx:,}줄 읽음)", percent)
+                    self.progress.emit(f"로그 파싱 중... ({line_idx:,}줄 읽음)", min(percent, 85))
 
                 match = detected_pattern["re"].match(line)
                 if match:
@@ -634,6 +614,8 @@ class LogParseWorker(QThread):
 
         self.progress.emit("DB 자원 정리 중...", 98)
         conn.close()
+        if hasattr(db, "close"):
+            db.close()
         del conn, db
         gc.collect()
 
@@ -645,7 +627,7 @@ class LogParseWorker(QThread):
 class DiagnosisWorker(QThread):
     finished = pyqtSignal(str, list, list, list)
 
-    def __init__(self, db_path):
+    def __init__(self, db_path: str):
         super().__init__()
         self.db_path = db_path
 
@@ -654,16 +636,20 @@ class DiagnosisWorker(QThread):
             db = kuzu.Database(self.db_path)
             conn = kuzu.Connection(db)
 
-            time_query = "MATCH (ex:Exception) RETURN Min(ex.timestamp) as start_time, Max(ex.timestamp) as end_time, Count(ex) as total_cnt"
+            time_query = "MATCH (ex:Exception) RETURN min(ex.timestamp) as start_time, max(ex.timestamp) as end_time, count(ex) as total_cnt"
             res = conn.execute(time_query)
-            if not res.has_next():  # type:ignore
+            if not res.has_next():
                 conn.close()
+                if hasattr(db, "close"):
+                    db.close()
                 self.finished.emit("장애 데이터를 찾을 수 없습니다.", [], [], [])
                 return
 
-            start_t, end_t, total_cnt = res.get_next()  # type:ignore
-            if total_cnt == 0:
+            start_t, end_t, total_cnt = res.get_next()
+            if not total_cnt or total_cnt == 0 or start_t is None:
                 conn.close()
+                if hasattr(db, "close"):
+                    db.close()
                 self.finished.emit("분석된 Exception 로그가 존재하지 않습니다.", [], [], [])
                 return
 
@@ -693,21 +679,20 @@ class DiagnosisWorker(QThread):
 
                     chart_q = """
                     MATCH (ex:Exception)
-                    WHERE ex.timestamp >= timestamp($s_time) AND ex.timestamp <= timestamp($e_time)
-                    RETURN Count(ex)
+                    WHERE ex.timestamp >= $s_time AND ex.timestamp <= $e_time
+                    RETURN count(ex)
                     """
                     res_chart = conn.execute(
                         chart_q,
                         {
-                            "s_time": step_s.strftime("%Y-%m-%d %H:%M:%S"),
-                            "e_time": step_e.strftime("%Y-%m-%d %H:%M:%S"),
+                            "s_time": step_s,
+                            "e_time": step_e,
                         },
                     )
-                    c_cnt = res_chart.get_next()[0] if res_chart.has_next() else 0  # type:ignore
+                    c_cnt = res_chart.get_next()[0] if res_chart.has_next() else 0
 
                     time_lbl = f"{step_s.strftime('%H:%M')}~{step_e.strftime('%H:%M')}"
-
-                    pct = int((c_cnt / total_cnt) * 100) if total_cnt > 0 else 0  # type:ignore
+                    pct = int((c_cnt / total_cnt) * 100) if total_cnt > 0 else 0
                     temp_data.append((step + 1, time_lbl, c_cnt, pct))
 
                 chart_10step_data = list(reversed(temp_data))
@@ -715,26 +700,29 @@ class DiagnosisWorker(QThread):
             except Exception as chart_err:
                 print(f"10단계 차트 산출 오류: {chart_err}")
 
-            thread_query = "MATCH (t:Thread) RETURN Count(t)"
+            thread_query = "MATCH (t:Thread) RETURN count(t)"
             res_thread = conn.execute(thread_query)
-            total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0  # type:ignore
+            total_threads = res_thread.get_next()[0] if res_thread.has_next() else 0
 
             db_cnt, net_cnt, auth_cnt, app_cnt = 0, 0, 0, 0
-            type_query = "MATCH (ex:Exception) RETURN ex.type, ex.message, Count(ex) as cnt"
+            type_query = "MATCH (ex:Exception) RETURN ex.type, ex.message, count(ex) as cnt"
             res_type = conn.execute(type_query)
             type_summary = ""
 
-            while res_type.has_next():  # type:ignore
-                ex_type, ex_msg, cnt = res_type.get_next()  # type:ignore
-                type_summary += f"     > {ex_type} ({cnt}건)\n"
+            while res_type.has_next():
+                ex_type, ex_msg, cnt = res_type.get_next()
+                str_type = str(ex_type or "")
+                str_msg = str(ex_msg or "")
+
+                type_summary += f"     > {str_type} ({cnt}건)\n"
 
                 if any(
-                    k in ex_type or k in ex_msg
+                    k in str_type or k in str_msg
                     for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
                 ):
-                    db_cnt += cnt  # type:ignore
+                    db_cnt += cnt
                 elif any(
-                    k in ex_type or k in ex_msg
+                    k in str_type or k in str_msg
                     for k in [
                         "ConnectException",
                         "SocketTimeout",
@@ -744,9 +732,9 @@ class DiagnosisWorker(QThread):
                         "SFTP",
                     ]
                 ):
-                    net_cnt += cnt  # type:ignore
+                    net_cnt += cnt
                 elif any(
-                    k in ex_type or k in ex_msg
+                    k in str_type or k in str_msg
                     for k in [
                         "Unauthorized",
                         "OAuth2",
@@ -756,13 +744,13 @@ class DiagnosisWorker(QThread):
                         "AccessDenied",
                     ]
                 ):
-                    auth_cnt += cnt  # type:ignore
+                    auth_cnt += cnt
                 else:
-                    app_cnt += cnt  # type:ignore
+                    app_cnt += cnt
 
-            db_pct = int((db_cnt / total_cnt) * 100)  # type:ignore
-            net_pct = int((net_cnt / total_cnt) * 100)  # type:ignore
-            auth_pct = int((auth_cnt / total_cnt) * 100)  # type:ignore
+            db_pct = int((db_cnt / total_cnt) * 100) if total_cnt > 0 else 0
+            net_pct = int((net_cnt / total_cnt) * 100) if total_cnt > 0 else 0
+            auth_pct = int((auth_cnt / total_cnt) * 100) if total_cnt > 0 else 0
             app_pct = max(0, 100 - (db_pct + net_pct + auth_pct))
 
             max_pct = max(db_pct, net_pct, auth_pct, app_pct)
@@ -801,21 +789,23 @@ class DiagnosisWorker(QThread):
             )
 
             root_data = []
-            root_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN Count(ex) as cnt, m.fullName, ex.type ORDER BY cnt DESC LIMIT 10"
+            root_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN count(ex) as cnt, m.fullName, ex.type ORDER BY cnt DESC LIMIT 10"
             res_root = conn.execute(root_query)
-            while res_root.has_next():  # type:ignore
-                cnt, method_name, ex_type = res_root.get_next()  # type:ignore
-                root_data.append((str(cnt), method_name, ex_type))
+            while res_root.has_next():
+                cnt, method_name, ex_type = res_root.get_next()
+                root_data.append((str(cnt), str(method_name or ""), str(ex_type or "")))
 
             recent_data = []
             recent_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
             res_recent = conn.execute(recent_query)
-            while res_recent.has_next():  # type:ignore
-                ts, method_name, ex_type = res_recent.get_next()  # type:ignore
+            while res_recent.has_next():
+                ts, method_name, ex_type = res_recent.get_next()
                 time_str = str(ts).split(".")[0]
-                recent_data.append((time_str, method_name, ex_type))
+                recent_data.append((time_str, str(method_name or ""), str(ex_type or "")))
 
             conn.close()
+            if hasattr(db, "close"):
+                db.close()
             del conn, db
             gc.collect()
 
@@ -850,21 +840,23 @@ class MainWindow(QMainWindow):
             self.conn = None
         if self.db:
             try:
-                self.db.close()
+                if hasattr(self.db, "close"):
+                    self.db.close()
             except Exception:
                 pass
             self.db = None
         gc.collect()
-        time.sleep(0.3)
+        time.sleep(0.2)
 
     def init_database_safely(self):
+        self.close_db_connection()
         try:
             self.db = kuzu.Database(DB_PATH)
-            time.sleep(0.2)
             self.conn = kuzu.Connection(self.db)
             create_schema(self.conn)
         except Exception as e:
-            print(f"DB 초기 연결 실패, 재시도: {e}")
+            print(f"DB 연결 중 초기화 오류 재시도: {e}")
+            time.sleep(0.3)
             self.close_db_connection()
             self.db = kuzu.Database(DB_PATH)
             self.conn = kuzu.Connection(self.db)
@@ -891,16 +883,7 @@ class MainWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.close_db_connection()
-
-            if os.path.exists(DB_PATH):
-                try:
-                    if os.path.isdir(DB_PATH):
-                        shutil.rmtree(DB_PATH)
-                    else:
-                        os.remove(DB_PATH)
-                except Exception as e:
-                    print(f"수동 초기화 중 삭제 실패: {e}")
-
+            safe_remove_db_path(DB_PATH)
             self.init_database_safely()
             self.reset_ui_components()
 
@@ -1042,18 +1025,22 @@ class MainWindow(QMainWindow):
             QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>")
         )
         self.table_root = QTableWidget(0, 3)
+        self.table_root.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_root.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_root.setHorizontalHeaderLabels(
             ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
         )
-        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
+        self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_root, 1)
 
         bottom_left_box.addWidget(QLabel("<b>🚨 최근 시간대별 에러 코드 랭킹 (최근 발생 순)</b>"))
         self.table_recent = QTableWidget(0, 3)
+        self.table_recent.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_recent.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_recent.setHorizontalHeaderLabels(
             ["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"]
         )
-        self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
+        self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_recent, 1)
 
         bottom_layout.addLayout(bottom_left_box, 1)
@@ -1066,7 +1053,7 @@ class MainWindow(QMainWindow):
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
         self.tree_view.setModel(self.tree_model)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # type:ignore
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_right_box.addWidget(self.tree_view)
         bottom_layout.addLayout(bottom_right_box, 1)
 
@@ -1075,17 +1062,17 @@ class MainWindow(QMainWindow):
         self.table_root.cellClicked.connect(self.on_root_table_clicked)
         self.table_recent.cellClicked.connect(self.on_recent_table_clicked)
 
-    def on_root_table_clicked(self, row, column):
+    def on_root_table_clicked(self, row: int, column: int):
         item = self.table_root.item(row, 1)
         if item:
             self.load_error_propagation_chain(item.text())
 
-    def on_recent_table_clicked(self, row, column):
+    def on_recent_table_clicked(self, row: int, column: int):
         item = self.table_recent.item(row, 1)
         if item:
             self.load_error_propagation_chain(item.text())
 
-    def load_error_propagation_chain(self, method_name):
+    def load_error_propagation_chain(self, method_name: str):
         self.tree_model.clear()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
 
@@ -1100,12 +1087,12 @@ class MainWindow(QMainWindow):
             RETURN ex.id, ex.type, ex.message, ex.stackTrace, ex.timestamp
             ORDER BY ex.timestamp DESC LIMIT 5
             """
-            res_ex = self.conn.execute(ex_query, {"method_name": method_name})  # type:ignore
+            res_ex = self.conn.execute(ex_query, {"method_name": method_name})
 
             has_data = False
-            while res_ex.has_next():  # type:ignore
+            while res_ex.has_next():
                 has_data = True
-                ex_id, ex_type, ex_msg, stack_trace, ts = res_ex.get_next()  # type:ignore
+                ex_id, ex_type, ex_msg, stack_trace, ts = res_ex.get_next()
 
                 ex_item = QStandardItem(f"🚨 [{str(ts).split('.')[0]}] {ex_type}: {ex_msg}")
 
@@ -1113,14 +1100,14 @@ class MainWindow(QMainWindow):
                 MATCH (ex:Exception {id: $ex_id})-[:CAUSED_BY]->(child:Exception)
                 RETURN child.type, child.message
                 """
-                res_cb = self.conn.execute(cb_query, {"ex_id": ex_id})  # type:ignore
-                while res_cb.has_next():  # type:ignore
-                    c_type, c_msg = res_cb.get_next()  # type:ignore
+                res_cb = self.conn.execute(cb_query, {"ex_id": ex_id})
+                while res_cb.has_next():
+                    c_type, c_msg = res_cb.get_next()
                     ex_item.appendRow(QStandardItem(f"  └─ 💥 Caused by: {c_type}: {c_msg}"))
 
                 if stack_trace:
                     st_item = QStandardItem("  📜 Stack Trace Sample")
-                    for line in stack_trace.split("\n")[:15]:
+                    for line in str(stack_trace).split("\n")[:15]:
                         st_item.appendRow(QStandardItem(f"      {line.strip()}"))
                     ex_item.appendRow(st_item)
 
@@ -1136,9 +1123,9 @@ class MainWindow(QMainWindow):
             RETURN DISTINCT caller.fullName
             LIMIT 5
             """
-            res_calls = self.conn.execute(calls_query, {"method_name": method_name})  # type:ignore
-            while res_calls.has_next():  # type:ignore
-                caller_full = res_calls.get_next()[0]  # type:ignore
+            res_calls = self.conn.execute(calls_query, {"method_name": method_name})
+            while res_calls.has_next():
+                caller_full = res_calls.get_next()[0]
                 root_node.appendRow(QStandardItem(f"  ⬆️ Called By: {caller_full}"))
 
             self.tree_model.appendRow(root_node)
@@ -1166,17 +1153,16 @@ class MainWindow(QMainWindow):
             self.worker.finished.connect(self.on_parse_finished)
             self.worker.start()
 
-    def on_progress_update(self, msg, value):
+    def on_progress_update(self, msg: str, value: int):
         self.lbl_status.setText(msg)
         self.progress_bar.setValue(value)
 
-    def on_pattern_detected(self, pattern_name):
+    def on_pattern_detected(self, pattern_name: str):
         self.lbl_detected_pattern.setText(f"🔍 감지된 로그 포맷: [{pattern_name}]")
 
-    def on_parse_finished(self, is_success, parsed_count):
-        self.init_database_safely()
-
+    def on_parse_finished(self, is_success: bool, parsed_count: int):
         if not is_success or parsed_count == 0:
+            self.init_database_safely()
             self.btn_upload.setEnabled(True)
             self.btn_upload.setText(
                 "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
@@ -1194,7 +1180,6 @@ class MainWindow(QMainWindow):
             return
 
         self.lbl_status.setText("파싱 완료! 정밀 사후 진단 보고서 작성 중...")
-        self.close_db_connection()
 
         self.diag_worker = DiagnosisWorker(DB_PATH)
         self.diag_worker.finished.connect(
@@ -1204,7 +1189,9 @@ class MainWindow(QMainWindow):
         )
         self.diag_worker.start()
 
-    def on_diagnosis_finished(self, report, root_data, recent_data, chart_data, parsed_count):
+    def on_diagnosis_finished(
+        self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int
+    ):
         self.init_database_safely()
 
         self.btn_upload.setEnabled(True)
@@ -1237,40 +1224,41 @@ class MainWindow(QMainWindow):
 
 
 # ==============================================================================
-# 6. 애플리케이션 실행 진입점 (DBeaver 스타일 Zero-Flicker 처리 적용)
+# 6. 애플리케이션 실행 진입점 (DBeaver 스타일 Zero-Flicker & 핸드오버 지연 버퍼 적용)
 # ==============================================================================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # 1. 커스텀 스플래시 생성 및 먼저 표출
+    # 1. 커스텀 스플래시 창 생성 및 화면 표출 (600x410 고정 및 오버레이 레이아웃)
     splash = CustomSplashScreen("splash.png")
     splash.show()
-    QApplication.processEvents()  # UI 즉시 렌더링 동기화
+    QApplication.processEvents()
 
-    # 2. PyQt6 스플래시가 화면을 가린 직후 PyInstaller 네이티브 스플래시 닫기
-    if pyi_splash and pyi_splash.is_alive():
-        pyi_splash.close()
+    # 2. PyInstaller 네이티브 스플래시 종료 (80ms 핸드오버 지연 버퍼 적용)
+    def close_native_splash():
+        if pyi_splash and pyi_splash.is_alive():
+            pyi_splash.close()
 
-    # 3. 메인 윈도우 인스턴스 생성 (숨김 상태 유지)
+    QTimer.singleShot(80, close_native_splash)
+
+    # 3. 메인 윈도우 인스턴스 생성 (초기 숨김 상태 유지)
     main_window = MainWindow()
 
-    # 4. 백그라운드 초기화 스레드 생성 및 바인딩
+    # 4. 백그라운드 초기화 스레드 연결
     init_worker = InitWorker(main_window)
     init_worker.progress.connect(splash.update_progress)
 
     def _finish_loading():
-        # [Double Buffering Zero-Flicker 파이프라인]
-        # ① 메인 윈도우를 스플래시 뒤편에 먼저 띄움
+        # 메인 창 표시 및 OS 수준 렌더링 강제 완료 (더블 버퍼링 교체)
         main_window.show()
-
-        # ② OS 수준에서 메인 UI 렌더링 강제 실행 및 동기화 (Flicker 완전 차단)
+        main_window.update()
         QApplication.processEvents()
 
-        # ③ 메인 창 렌더링 직후 상단의 PyQt6 스플래시 제거
+        # 스플래시 창 안전 파기
         splash.close()
         splash.deleteLater()
 
-        # ④ 메인 윈도우 포커스 강제 지정
+        # 메인 창 포커스 이동
         main_window.raise_()
         main_window.activateWindow()
 
