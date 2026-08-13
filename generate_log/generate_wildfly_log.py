@@ -2,22 +2,21 @@ import datetime
 import os
 import random
 
-OUTPUT_FILENAME = "catalina_test.log"
+OUTPUT_FILENAME = "wildfly_server.log"
 TOTAL_RECORDS = 100000
 
-# Tomcat 정상 로그 템플릿
+# WildFly 정상 로그 템플릿
 LOG_TEMPLATES = [
-    ("INFO", "http-nio-8080-exec-{exec_id}", "org.apache.catalina.core.ContainerBase", "Initializing Servlet 'dispatcherServlet'"),
-    ("INFO", "http-nio-8080-exec-{exec_id}", "com.example.demo.controller.OrderController", "Completed 200 OK for request [/api/v1/orders]"),
-    ("DEBUG", "http-nio-8080-exec-{exec_id}", "com.example.demo.repository.UserRepository", "Fetching user profile for user_id: {user_id}"),
-    ("WARN", "http-nio-8080-exec-{exec_id}", "org.apache.catalina.connector.CoyoteAdapter", "Acknowledge request timing delay detected"),
+    ("INFO", "default task-{exec_id}", "org.wildfly.extension.undertow", "JBWEB001083: Undertow HTTP listener default listening on 0.0.0.0:8080"),
+    ("INFO", "default task-{exec_id}", "com.example.demo.controller.OrderController", "Completed 200 OK for request [/api/v1/orders]"),
+    ("DEBUG", "default task-{exec_id}", "org.jboss.as.jpa", "Starting JPA transaction for EntityManager"),
+    ("WARN", "ServerService Thread Pool -- {exec_id}", "org.jboss.as.dependency.private", "WFLYSRV0018: Deployment delay detected"),
 ]
 
-# 장애 시나리오 모음
+# 장애 시나리오 모음 (동일 4대 장애)
 ERROR_SCENARIOS = [
-    # 1. DB/Pool 병목
     {
-        "logger": "com.zaxxer.hikari.pool.HikariPool",
+        "logger": "org.hibernate.engine.jdbc.spi.SqlExceptionHelper",
         "type": "org.springframework.dao.CannotAcquireLockException",
         "msg": "Could not open JPA EntityManager for transaction; nested exception is org.hibernate.exception.JDBCConnectionException",
         "stack": [("com.example.demo.repository.UserRepository", "findById", 45), ("com.example.demo.service.UserService", "getUserDetails", 112)],
@@ -26,18 +25,13 @@ ERROR_SCENARIOS = [
             "msg": "Connection is not available, request timed out after 30000ms.",
         },
     },
-    # 2. 외부 통신 타임아웃
     {
         "logger": "com.example.demo.service.PaymentService",
         "type": "org.springframework.web.client.ResourceAccessException",
         "msg": 'I/O error on POST request for "https://api.external-pg.com/v1/payments": Read timed out',
-        "stack": [
-            ("com.example.demo.service.PaymentService", "processPayment", 146),
-            ("com.example.demo.controller.OrderController", "createOrder", 29),
-        ],
-        "caused_by": {"type": "java.net.SocketTimeoutException", "msg": "Read timed out at java.net.SocketInputStream.socketRead0"},
+        "stack": [("com.example.demo.service.PaymentService", "processPayment", 146)],
+        "caused_by": {"type": "java.net.SocketTimeoutException", "msg": "Read timed out"},
     },
-    # 3. 인증/보안
     {
         "logger": "com.example.demo.security.JwtAuthenticationFilter",
         "type": "io.jsonwebtoken.ExpiredJwtException",
@@ -45,7 +39,6 @@ ERROR_SCENARIOS = [
         "stack": [("com.example.demo.security.JwtTokenProvider", "validateToken", 67)],
         "caused_by": None,
     },
-    # 4. NullPointer
     {
         "logger": "com.example.demo.service.NotificationService",
         "type": "java.lang.NullPointerException",
@@ -56,30 +49,30 @@ ERROR_SCENARIOS = [
 ]
 
 
-def generate_tomcat_logs():
-    print(f"🚀 Tomcat catalina.out 테스트 로그 생성 시작: {OUTPUT_FILENAME}")
+def generate_wildfly_logs():
+    print(f"🚀 WildFly server.log 테스트 로그 생성 시작: {OUTPUT_FILENAME}")
     current_time = datetime.datetime(2026, 8, 13, 9, 0, 0)
 
     with open(OUTPUT_FILENAME, "w", encoding="utf-8") as f:
         for _ in range(TOTAL_RECORDS):
             current_time += datetime.timedelta(milliseconds=random.randint(50, 500))
-            # Tomcat 타임스탬프 포맷: 2026-08-13 09:00:00.123
-            timestamp_str = current_time.strftime("%Y-%m-%d %H:%M:%S.") + f"{random.randint(100, 999)}"
+            # WildFly 타임스탬프 포맷 (밀리초 구분자 쉼표 사용): 2026-08-13 09:00:00,123
+            timestamp_str = current_time.strftime("%Y-%m-%d %H:%M:%S,") + f"{random.randint(100, 999)}"
             exec_id = random.randint(1, 20)
 
             if random.random() < 0.12:
                 scenario = random.choice(ERROR_SCENARIOS)
-                f.write(f"{timestamp_str} [http-nio-8080-exec-{exec_id}] ERROR {scenario['logger']} - {scenario['type']}: {scenario['msg']}\n")
+                f.write(f"{timestamp_str} ERROR [{scenario['logger']}] (default task-{exec_id}) {scenario['type']}: {scenario['msg']}\n")
                 f.writelines(f"\tat {cls}.{method}({cls.split('.')[-1]}.java:{line_num})\n" for cls, method, line_num in scenario["stack"])
                 if scenario["caused_by"]:
                     f.write(f"Caused by: {scenario['caused_by']['type']}: {scenario['caused_by']['msg']}\n")
             else:
                 level, thread_tmpl, logger, msg = random.choice(LOG_TEMPLATES)
                 thread = thread_tmpl.format(exec_id=exec_id)
-                f.write(f"{timestamp_str} [{thread}] {level:<5} {logger} - {msg}\n")
+                f.write(f"{timestamp_str} {level:<5} [{logger}] ({thread}) {msg}\n")
 
-    print(f"✅ Tomcat 로그 생성 완료: {OUTPUT_FILENAME}")
+    print(f"✅ WildFly 로그 생성 완료: {OUTPUT_FILENAME}")
 
 
 if __name__ == "__main__":
-    generate_tomcat_logs()
+    generate_wildfly_logs()

@@ -38,6 +38,8 @@ except ImportError:
     pyi_splash = None
 
 DB_PATH = "./kuzu_unified_log_db"
+# 8GB / 16GB 등 사양에 맞게 조정 가능한 Kùzu 버퍼 풀 크기 (예: 4GB)
+KUZU_BUFFER_POOL_SIZE = 4 * 1024 * 1024 * 1024
 
 
 # ==============================================================================
@@ -69,7 +71,7 @@ def get_resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
-def safe_remove_db_path(path: str, retries: int = 3, delay: float = 0.2):
+def safe_remove_db_path(path: str, retries: int = 5, delay: float = 0.3):
     """DB 폴더/파일 안전 삭제 헬퍼 함수 (파일 잠금 해제 지연 대응)"""
     if not os.path.exists(path):
         return
@@ -93,19 +95,13 @@ def safe_remove_db_path(path: str, retries: int = 3, delay: float = 0.2):
 class CustomSplashScreen(QWidget):
     def __init__(self, image_path: str = "splash.png"):
         super().__init__()
-        self.setWindowFlags(
-            Qt.WindowType.Window
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        # 창 크기 600x410 고정 (크기 변화 및 깜빡임 차단)
         target_width = 600
         target_height = 410
         self.setFixedSize(target_width, target_height)
 
-        # ① 전체 창 크기와 동일한 단일 배경 이미지 렌더링 QLabel
         self.lbl_bg = QLabel(self)
         self.lbl_bg.setGeometry(0, 0, target_width, target_height)
 
@@ -127,7 +123,6 @@ class CustomSplashScreen(QWidget):
                 "color: #00d2d3; font-size: 22px; font-weight: bold; background-color: #0d131d; border: 1px solid #2a2b2d; border-radius: 8px;"
             )
 
-        # ② 하단 60px 공간 위에 상태 안내 텍스트와 프로그래스 바 오버레이(Overlay) 배치
         bottom_height = 60
         bottom_container = QWidget(self)
         bottom_container.setGeometry(0, target_height - bottom_height, target_width, bottom_height)
@@ -139,9 +134,7 @@ class CustomSplashScreen(QWidget):
 
         self.lbl_status = QLabel("시스템 초기화 진행 중...")
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_status.setStyleSheet(
-            "color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;"
-        )
+        self.lbl_status.setStyleSheet("color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;")
         bottom_layout.addWidget(self.lbl_status)
 
         self.progress_bar = QProgressBar()
@@ -183,11 +176,11 @@ class InitWorker(QThread):
 
     def run(self):
         self.progress.emit("데이터베이스 연결 준비 중...", 20)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         self.progress.emit("데이터베이스 스키마 검증 및 연결...", 50)
         try:
-            db = kuzu.Database(DB_PATH)
+            db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
             conn = kuzu.Connection(db)
             create_schema(conn)
             conn.close()
@@ -199,7 +192,7 @@ class InitWorker(QThread):
             print(f"초기화 DB 스키마 생성 중 예외 발생: {e}")
 
         self.progress.emit("사용자 인터페이스 구성 요소 로딩 중...", 80)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         self.progress.emit("초기화 완료!", 100)
         time.sleep(0.1)
@@ -223,9 +216,7 @@ def create_schema(conn: kuzu.Connection):
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS Exception(id STRING, type STRING, message STRING, stackTrace STRING, timestamp TIMESTAMP, PRIMARY KEY (id))"
     )
-    conn.execute(
-        "CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))"
-    )
+    conn.execute("CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))")
     conn.execute("CREATE NODE TABLE IF NOT EXISTS Class(name STRING, PRIMARY KEY (name))")
 
     conn.execute("CREATE REL TABLE IF NOT EXISTS RAISED(FROM Thread TO Exception)")
@@ -236,17 +227,18 @@ def create_schema(conn: kuzu.Connection):
 
 
 # ==============================================================================
-# 4. 로그 파싱 및 진단 워커 Thread
+# 4. 고속 스트리밍 로그 파싱 및 진단 워커 Thread (5가지 최적화 아키텍처 결합)
 # ==============================================================================
 class LogParseWorker(QThread):
     progress = pyqtSignal(str, int)
     pattern_detected = pyqtSignal(str)
     finished = pyqtSignal(bool, int)
 
-    def __init__(self, file_path: str, db_path: str):
+    def __init__(self, file_path: str, db_path: str, chunk_error_limit: int = 5000):
         super().__init__()
         self.file_path = file_path
         self.db_path = db_path
+        self.chunk_error_limit = chunk_error_limit  # 배치(청크) 처리 커밋 단위
 
     def run(self):
         self.progress.emit("기존 DB 데이터 자동 초기화 중...", 3)
@@ -254,7 +246,8 @@ class LogParseWorker(QThread):
 
         self.progress.emit("신규 데이터베이스 스키마 구성 중...", 7)
         try:
-            db = kuzu.Database(self.db_path)
+            # 버퍼 풀 메모리 할당 (KUZU_BUFFER_POOL_SIZE) 적용
+            db = kuzu.Database(self.db_path, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
             conn = kuzu.Connection(db)
             create_schema(conn)
         except Exception as e:
@@ -264,9 +257,13 @@ class LogParseWorker(QThread):
 
         PATTERNS = [
             {
-                "name": "Spring Boot 로그 포맷",
+                "name": "Spring Boot 2.x / 3.x 통합 로그 포맷",
+                # 1: Timestamp (ISO-8601 및 Classic), 2: Level, 3: PID, 4: Thread, 5: Logger, 6: Message
                 "re": re.compile(
-                    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(?:[+-]\d{2}:\d{2})?)\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s+(\d+)\s+---\s+\[([^\]]+)\]\s+([\w\.\$]+)\s+:\s+(.*)"
+                    r"^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:[\.,]\d{3})?(?:[+-]\d{2}:?\d{2}|Z)?)\s+"
+                    r"(ERROR|WARN|INFO|DEBUG|TRACE|FATAL)\s+"
+                    r"(\d+|-)\s+---\s+\[([^\]]+)\]\s+"
+                    r"([^\s:]+)\s+:\s+(.*)"
                 ),
                 "parse": lambda m: (
                     parse_clean_timestamp(m.group(1)),
@@ -277,9 +274,13 @@ class LogParseWorker(QThread):
                 ),
             },
             {
-                "name": "Tomcat / Standard Log4j 로그 포맷",
+                "name": "Tomcat / Standard Log4j2 / Logback 포맷",
+                # 1: Timestamp, 2: Thread, 3: Level, 4: Logger, 5: Message
                 "re": re.compile(
-                    r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+\[([^\]]+)\]\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s+([\w\.]+)\s+-\s+(.*)"
+                    r"^(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:[\.,]\d{3})?)\s+"
+                    r"\[([^\]]+)\]\s+"
+                    r"(ERROR|WARN|INFO|DEBUG|TRACE|FATAL)\s+"
+                    r"([^\s\-]+)\s+-\s+(.*)"
                 ),
                 "parse": lambda m: (
                     parse_clean_timestamp(m.group(1)),
@@ -291,8 +292,11 @@ class LogParseWorker(QThread):
             },
             {
                 "name": "WildFly / JBoss server.log 포맷",
+                # 1: Timestamp, 2: Level, 3: Logger, 4: Thread, 5: Message
                 "re": re.compile(
-                    r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:,\d{3})?)\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s+\[([^\]]+)\]\s+\(([^\)]+)\)\s+(.*)"
+                    r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:[\.,]\d{3})?)\s+"
+                    r"(ERROR|WARN|INFO|DEBUG|TRACE|FATAL)\s+"
+                    r"\[([^\]]+)\]\s+\(([^\)]+)\)\s+(.*)"
                 ),
                 "parse": lambda m: (
                     parse_clean_timestamp(m.group(1)),
@@ -302,18 +306,55 @@ class LogParseWorker(QThread):
                     m.group(2),
                 ),
             },
+            {
+                "name": "WebLogic / Generic WAS Standard Out 포맷",
+                # 1: Timestamp, 2: Level, 3: Thread, 4: Logger, 5: Message
+                "re": re.compile(
+                    r"^<(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:[\.,]\d{3})?)>\s+"
+                    r"<(ERROR|WARN|INFO|DEBUG|TRACE|FATAL|Error|Warning)>\s+"
+                    r"<([^>]+)>\s+<([^>]+)>\s+(.*)"
+                ),
+                "parse": lambda m: (
+                    parse_clean_timestamp(m.group(1)),
+                    m.group(3).strip(),
+                    m.group(4),
+                    m.group(5),
+                    m.group(2).upper(),
+                ),
+            },
         ]
 
         FRAMEWORK_PACKAGES = (
+            # Java Standard & Enterprise Spec
             "java.",
             "javax.",
             "jakarta.",
-            "org.springframework.",
-            "org.apache.",
-            "com.zaxxer.",
-            "org.hibernate.",
             "sun.",
             "jdk.",
+            # Core Frameworks & Public Institutions
+            "org.springframework.",
+            "egovframework.",  # 전자정부프레임워크
+            # Web Engine / Network / Reactive
+            "org.apache.",
+            "io.netty.",  # Netty Network Engine
+            "io.undertow.",  # WildFly/JBoss Web Server
+            # ORM & DB Pooling
+            "org.hibernate.",
+            "org.mybatis.",  # MyBatis SQL Mapper
+            "com.zaxxer.",  # HikariCP
+            # Data & Cache (Redis / Mongo)
+            "io.lettuce.",  # Redis Client
+            "org.redisson.",  # Redis Client
+            # JSON & Serialization
+            "com.fasterxml.jackson.",
+            "com.google.gson.",
+            # Microservice & Netflix OSS
+            "com.netflix.",
+            # Utility & Internal Tools
+            "lombok.",
+            "org.slf4j.",
+            "ch.qos.logback.",
+            "org.apache.logging.",
         )
 
         if not os.path.exists(self.file_path):
@@ -352,26 +393,156 @@ class LogParseWorker(QThread):
 
         self.pattern_detected.emit(detected_pattern["name"])
 
-        threads_set = set()
-        classes_set = set()
-        methods_dict = {}
-        exceptions_dict = {}
+        # 앱 레벨 캐싱 (Global Caching) - 전체 주입 기간 동안 고유 노드 존재 여부 기록
+        global_threads_set = set()
+        global_classes_set = set()
+        global_methods_set = set()
 
-        raised_set = set()
-        occurred_in_set = set()
-        belongs_to_set = set()
-        calls_set = set()
-        caused_by_set = set()
+        # 청크 단위 버퍼 (2-Pass 데이터 저장용)
+        chunk_threads_set = set()
+        chunk_classes_set = set()
+        chunk_methods_dict = {}
+        chunk_exceptions_dict = {}
+
+        chunk_raised_set = set()
+        chunk_occurred_in_set = set()
+        chunk_belongs_to_set = set()
+        chunk_calls_set = set()
+        chunk_caused_by_set = set()
 
         parsed_error_count = 0
+        chunk_error_count = 0
         bytes_read = 0
 
+        # 청크 단위 DB 주입 (2-Pass 노드/관계 분리 주입 + PyArrow Zero-Copy)
+        def commit_chunk():
+            nonlocal chunk_error_count
+
+            # PASS 1: Node Ingestion (중복 노드는 앱 레벨 Caching으로 걸러냄)
+            # 1-1. Thread Node
+            new_threads = chunk_threads_set - global_threads_set
+            if new_threads:
+                t_table = pa.Table.from_arrays([pa.array(list(new_threads), type=pa.string())], names=["name"])
+                conn.execute("COPY Thread FROM t_table")
+                global_threads_set.update(new_threads)
+
+            # 1-2. Class Node
+            new_classes = chunk_classes_set - global_classes_set
+            if new_classes:
+                c_table = pa.Table.from_arrays([pa.array(list(new_classes), type=pa.string())], names=["name"])
+                conn.execute("COPY Class FROM c_table")
+                global_classes_set.update(new_classes)
+
+            # 1-3. Method Node
+            new_methods_dict = {k: v for k, v in chunk_methods_dict.items() if k not in global_methods_set}
+            if new_methods_dict:
+                m_full = [v[0] for v in new_methods_dict.values()]
+                m_name = [v[1] for v in new_methods_dict.values()]
+                m_fw = [v[2] for v in new_methods_dict.values()]
+                m_table = pa.Table.from_arrays(
+                    [
+                        pa.array(m_full, type=pa.string()),
+                        pa.array(m_name, type=pa.string()),
+                        pa.array(m_fw, type=pa.bool_()),
+                    ],
+                    names=["fullName", "name", "isFramework"],
+                )
+                conn.execute("COPY Method FROM m_table")
+                global_methods_set.update(new_methods_dict.keys())
+
+            # 1-4. Exception Node
+            if chunk_exceptions_dict:
+                e_ids = [v[0] for v in chunk_exceptions_dict.values()]
+                e_types = [v[1] for v in chunk_exceptions_dict.values()]
+                e_msgs = [v[2] for v in chunk_exceptions_dict.values()]
+                e_sts = [v[3] for v in chunk_exceptions_dict.values()]
+                e_tss = [v[4] for v in chunk_exceptions_dict.values()]
+                e_table = pa.Table.from_arrays(
+                    [
+                        pa.array(e_ids, type=pa.string()),
+                        pa.array(e_types, type=pa.string()),
+                        pa.array(e_msgs, type=pa.string()),
+                        pa.array(e_sts, type=pa.string()),
+                        pa.array(e_tss, type=pa.timestamp("us")),
+                    ],
+                    names=["id", "type", "message", "stackTrace", "timestamp"],
+                )
+                conn.execute("COPY Exception FROM e_table")
+
+            # PASS 2: Relationship Ingestion
+            if chunk_raised_set:
+                r_table = pa.Table.from_arrays(
+                    [
+                        pa.array([v[0] for v in chunk_raised_set], type=pa.string()),
+                        pa.array([v[1] for v in chunk_raised_set], type=pa.string()),
+                    ],
+                    names=["from", "to"],
+                )
+                conn.execute("COPY RAISED FROM r_table")
+
+            if chunk_occurred_in_set:
+                o_table = pa.Table.from_arrays(
+                    [
+                        pa.array([v[0] for v in chunk_occurred_in_set], type=pa.string()),
+                        pa.array([v[1] for v in chunk_occurred_in_set], type=pa.string()),
+                    ],
+                    names=["from", "to"],
+                )
+                conn.execute("COPY OCCURRED_IN FROM o_table")
+
+            if chunk_belongs_to_set:
+                b_table = pa.Table.from_arrays(
+                    [
+                        pa.array([v[0] for v in chunk_belongs_to_set], type=pa.string()),
+                        pa.array([v[1] for v in chunk_belongs_to_set], type=pa.string()),
+                    ],
+                    names=["from", "to"],
+                )
+                conn.execute("COPY BELONGS_TO FROM b_table")
+
+            if chunk_calls_set:
+                c_table = pa.Table.from_arrays(
+                    [
+                        pa.array([v[0] for v in chunk_calls_set], type=pa.string()),
+                        pa.array([v[1] for v in chunk_calls_set], type=pa.string()),
+                    ],
+                    names=["from", "to"],
+                )
+                conn.execute("COPY CALLS FROM c_table")
+
+            if chunk_caused_by_set:
+                cb_table = pa.Table.from_arrays(
+                    [
+                        pa.array([v[0] for v in chunk_caused_by_set], type=pa.string()),
+                        pa.array([v[1] for v in chunk_caused_by_set], type=pa.string()),
+                    ],
+                    names=["from", "to"],
+                )
+                conn.execute("COPY CAUSED_BY FROM cb_table")
+
+            # 청크 메모리 초기화 및 수동 GC 호출
+            chunk_threads_set.clear()
+            chunk_classes_set.clear()
+            chunk_methods_dict.clear()
+            chunk_exceptions_dict.clear()
+
+            chunk_raised_set.clear()
+            chunk_occurred_in_set.clear()
+            chunk_belongs_to_set.clear()
+            chunk_calls_set.clear()
+            chunk_caused_by_set.clear()
+
+            chunk_error_count = 0
+            gc.collect()
+
         def process_context(ctx):
-            nonlocal parsed_error_count
+            nonlocal parsed_error_count, chunk_error_count
             if not ctx:
                 return
 
             parsed_error_count += 1
+            chunk_error_count += 1
+
             root_ex_id = ctx["root_ex_id"]
             clean_ts = ctx["clean_timestamp"]
 
@@ -380,23 +551,24 @@ class LogParseWorker(QThread):
             except Exception:
                 dt_obj = datetime(1970, 1, 1, 0, 0, 0)
 
-            full_stack_trace = "\n".join(ctx["raw_stack_trace_lines"][:100])
+            # 스택트레이스 저장 길이 25줄 상한으로 최적화
+            full_stack_trace = "\n".join(ctx["raw_stack_trace_lines"][:25])
 
             t_name = ctx["thread_name"]
-            threads_set.add(t_name)
-            exceptions_dict[root_ex_id] = (
+            chunk_threads_set.add(t_name)
+            chunk_exceptions_dict[root_ex_id] = (
                 root_ex_id,
                 ctx["ex_type"],
                 ctx["ex_msg"][:1000],
                 full_stack_trace,
                 dt_obj,
             )
-            raised_set.add((t_name, root_ex_id))
+            chunk_raised_set.add((t_name, root_ex_id))
 
             parent_id = root_ex_id
             for c_id, c_type, c_msg in ctx["caused_list"]:
-                exceptions_dict[c_id] = (c_id, c_type, c_msg[:1000], "", dt_obj)
-                caused_by_set.add((parent_id, c_id))
+                chunk_exceptions_dict[c_id] = (c_id, c_type, c_msg[:1000], "", dt_obj)
+                chunk_caused_by_set.add((parent_id, c_id))
                 parent_id = c_id
 
             target_occ_id = parent_id
@@ -406,41 +578,47 @@ class LogParseWorker(QThread):
                 target_occ = next((item for item in call_chain if not item[3]), call_chain[0])
                 occ_class, occ_method, occ_full, is_fw = target_occ
 
-                classes_set.add(occ_class)
-                methods_dict[occ_full] = (occ_full, occ_method, is_fw)
-                belongs_to_set.add((occ_full, occ_class))
-                occurred_in_set.add((target_occ_id, occ_full))
+                chunk_classes_set.add(occ_class)
+                chunk_methods_dict[occ_full] = (occ_full, occ_method, is_fw)
+                chunk_belongs_to_set.add((occ_full, occ_class))
+                chunk_occurred_in_set.add((target_occ_id, occ_full))
 
                 for k in range(min(len(call_chain) - 1, 15)):
                     callee_class, callee_method, callee_full, callee_fw = call_chain[k]
                     caller_class, caller_method, caller_full, caller_fw = call_chain[k + 1]
 
-                    classes_set.add(callee_class)
-                    methods_dict[callee_full] = (callee_full, callee_method, callee_fw)
-                    belongs_to_set.add((callee_full, callee_class))
+                    chunk_classes_set.add(callee_class)
+                    chunk_methods_dict[callee_full] = (callee_full, callee_method, callee_fw)
+                    chunk_belongs_to_set.add((callee_full, callee_class))
 
-                    classes_set.add(caller_class)
-                    methods_dict[caller_full] = (caller_full, caller_method, caller_fw)
-                    belongs_to_set.add((caller_full, caller_class))
+                    chunk_classes_set.add(caller_class)
+                    chunk_methods_dict[caller_full] = (caller_full, caller_method, caller_fw)
+                    chunk_belongs_to_set.add((caller_full, caller_class))
 
-                    calls_set.add((caller_full, callee_full))
+                    chunk_calls_set.add((caller_full, callee_full))
+
+            # 설정된 에러 청크 임계치 도달 시 DB 배치 커밋 진행
+            if chunk_error_count >= self.chunk_error_limit:
+                commit_chunk()
 
         current_ctx = None
         caused_seq = 0
 
+        # 청크 단위 분할 라인 스트리밍
         with open(self.file_path, "r", encoding="utf-8", errors="ignore") as f:
             for line_idx, line in enumerate(f):
                 bytes_read += len(line.encode("utf-8"))
 
-                if line_idx % 5000 == 0:
+                if line_idx % 10000 == 0:
                     percent = int(12 + (bytes_read / file_size) * 73)
-                    self.progress.emit(f"로그 파싱 중... ({line_idx:,}줄 읽음)", min(percent, 85))
+                    self.progress.emit(
+                        f"대용량 스트리밍 분석 중... ({line_idx:,}줄 / 파싱된 에러: {parsed_error_count:,}건)",
+                        min(percent, 85),
+                    )
 
                 match = detected_pattern["re"].match(line)
                 if match:
-                    clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern[
-                        "parse"
-                    ](match)
+                    clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern["parse"](match)
 
                     if log_level == "ERROR":
                         if current_ctx:
@@ -480,7 +658,7 @@ class LogParseWorker(QThread):
                         line_stripped = line.strip()
 
                         if line_stripped.startswith("Caused by:"):
-                            if len(current_ctx["raw_stack_trace_lines"]) < 100:
+                            if len(current_ctx["raw_stack_trace_lines"]) < 25:
                                 current_ctx["raw_stack_trace_lines"].append(line.rstrip())
 
                             caused_seq += 1
@@ -495,7 +673,7 @@ class LogParseWorker(QThread):
                             current_ctx["caused_list"].append((caused_ex_id, c_type, c_msg))
 
                         elif line_stripped.startswith("at "):
-                            if len(current_ctx["raw_stack_trace_lines"]) < 100:
+                            if len(current_ctx["raw_stack_trace_lines"]) < 25:
                                 current_ctx["raw_stack_trace_lines"].append(line.rstrip())
 
                             method_raw = line_stripped[3:].split("(")[0].strip()
@@ -505,114 +683,25 @@ class LogParseWorker(QThread):
                                 is_fw = class_name.startswith(FRAMEWORK_PACKAGES)
 
                                 if len(current_ctx["call_chain"]) < 30:
-                                    current_ctx["call_chain"].append(
-                                        (class_name, method_name, full_method, is_fw)
-                                    )
+                                    current_ctx["call_chain"].append((class_name, method_name, full_method, is_fw))
 
                         elif line.startswith("\t") or line.startswith("   "):
-                            if len(current_ctx["raw_stack_trace_lines"]) < 100:
+                            if len(current_ctx["raw_stack_trace_lines"]) < 25:
                                 current_ctx["raw_stack_trace_lines"].append(line.rstrip())
 
             if current_ctx:
                 process_context(current_ctx)
 
-        self.progress.emit("DB 고속 벌크 인덱싱(COPY FROM) 진행 중...", 88)
+        # 잔여 청크 최종 DB 커밋
+        self.progress.emit("잔여 파싱 데이터 DB 플러시 중...", 88)
+        commit_chunk()
 
-        if threads_set:
-            t_table = pa.Table.from_arrays(
-                [pa.array(list(threads_set), type=pa.string())], names=["name"]
-            )
-            conn.execute("COPY Thread FROM t_table")
+        # 메모리 정리
+        global_threads_set.clear()
+        global_classes_set.clear()
+        global_methods_set.clear()
 
-        if classes_set:
-            c_table = pa.Table.from_arrays(
-                [pa.array(list(classes_set), type=pa.string())], names=["name"]
-            )
-            conn.execute("COPY Class FROM c_table")
-
-        if methods_dict:
-            m_full = [v[0] for v in methods_dict.values()]
-            m_name = [v[1] for v in methods_dict.values()]
-            m_fw = [v[2] for v in methods_dict.values()]
-            m_table = pa.Table.from_arrays(
-                [
-                    pa.array(m_full, type=pa.string()),
-                    pa.array(m_name, type=pa.string()),
-                    pa.array(m_fw, type=pa.bool_()),
-                ],
-                names=["fullName", "name", "isFramework"],
-            )
-            conn.execute("COPY Method FROM m_table")
-
-        if exceptions_dict:
-            e_ids = [v[0] for v in exceptions_dict.values()]
-            e_types = [v[1] for v in exceptions_dict.values()]
-            e_msgs = [v[2] for v in exceptions_dict.values()]
-            e_sts = [v[3] for v in exceptions_dict.values()]
-            e_tss = [v[4] for v in exceptions_dict.values()]
-            e_table = pa.Table.from_arrays(
-                [
-                    pa.array(e_ids, type=pa.string()),
-                    pa.array(e_types, type=pa.string()),
-                    pa.array(e_msgs, type=pa.string()),
-                    pa.array(e_sts, type=pa.string()),
-                    pa.array(e_tss, type=pa.timestamp("us")),
-                ],
-                names=["id", "type", "message", "stackTrace", "timestamp"],
-            )
-            conn.execute("COPY Exception FROM e_table")
-
-        if raised_set:
-            r_table = pa.Table.from_arrays(
-                [
-                    pa.array([v[0] for v in raised_set], type=pa.string()),
-                    pa.array([v[1] for v in raised_set], type=pa.string()),
-                ],
-                names=["from", "to"],
-            )
-            conn.execute("COPY RAISED FROM r_table")
-
-        if occurred_in_set:
-            o_table = pa.Table.from_arrays(
-                [
-                    pa.array([v[0] for v in occurred_in_set], type=pa.string()),
-                    pa.array([v[1] for v in occurred_in_set], type=pa.string()),
-                ],
-                names=["from", "to"],
-            )
-            conn.execute("COPY OCCURRED_IN FROM o_table")
-
-        if belongs_to_set:
-            b_table = pa.Table.from_arrays(
-                [
-                    pa.array([v[0] for v in belongs_to_set], type=pa.string()),
-                    pa.array([v[1] for v in belongs_to_set], type=pa.string()),
-                ],
-                names=["from", "to"],
-            )
-            conn.execute("COPY BELONGS_TO FROM b_table")
-
-        if calls_set:
-            c_table = pa.Table.from_arrays(
-                [
-                    pa.array([v[0] for v in calls_set], type=pa.string()),
-                    pa.array([v[1] for v in calls_set], type=pa.string()),
-                ],
-                names=["from", "to"],
-            )
-            conn.execute("COPY CALLS FROM c_table")
-
-        if caused_by_set:
-            cb_table = pa.Table.from_arrays(
-                [
-                    pa.array([v[0] for v in caused_by_set], type=pa.string()),
-                    pa.array([v[1] for v in caused_by_set], type=pa.string()),
-                ],
-                names=["from", "to"],
-            )
-            conn.execute("COPY CAUSED_BY FROM cb_table")
-
-        self.progress.emit("DB 자원 정리 중...", 98)
+        self.progress.emit("DB 자원 cleanup 진행 중...", 98)
         conn.close()
         if hasattr(db, "close"):
             db.close()
@@ -633,7 +722,7 @@ class DiagnosisWorker(QThread):
 
     def run(self):
         try:
-            db = kuzu.Database(self.db_path)
+            db = kuzu.Database(self.db_path, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
             conn = kuzu.Connection(db)
 
             time_query = "MATCH (ex:Exception) RETURN min(ex.timestamp) as start_time, max(ex.timestamp) as end_time, count(ex) as total_cnt"
@@ -655,16 +744,8 @@ class DiagnosisWorker(QThread):
 
             chart_10step_data = []
             try:
-                dt_start = (
-                    datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
-                    if isinstance(start_t, str)
-                    else start_t
-                )
-                dt_end = (
-                    datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
-                    if isinstance(end_t, str)
-                    else end_t
-                )
+                dt_start = datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(start_t, str) else start_t
+                dt_end = datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(end_t, str) else end_t
                 total_duration = (dt_end - dt_start).total_seconds()
 
                 if total_duration <= 0:
@@ -714,12 +795,9 @@ class DiagnosisWorker(QThread):
                 str_type = str(ex_type or "")
                 str_msg = str(ex_msg or "")
 
-                type_summary += f"     > {str_type} ({cnt}건)\n"
+                type_summary += f"     > {str_type} ({cnt:,}건)\n"
 
-                if any(
-                    k in str_type or k in str_msg
-                    for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
-                ):
+                if any(k in str_type or k in str_msg for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]):
                     db_cnt += cnt
                 elif any(
                     k in str_type or k in str_msg
@@ -774,8 +852,8 @@ class DiagnosisWorker(QThread):
                 f" [장애 사후 진단서]  발생 시간대: {str(start_t).split('.')[0]} ~ {str(end_t).split('.')[0]}\n"
                 f"=========================================================================================================\n"
                 f" ■ 인프라 및 애플리케이션 영향도 검사 지표\n"
-                f"   - 총 누적 예외 발생수 : {total_cnt}건\n"
-                f"   - 영향받은 워커 스레드 수 : {total_threads}개\n"
+                f"   - 총 누적 예외 발생수 : {total_cnt:,}건\n"
+                f"   - 영향받은 워커 스레드 수 : {total_threads:,}개\n"
                 f"   - 자동 진단 분류 등급 : {diagnosis_tag}\n\n"
                 f" ■ 도메인별 장애 유발 지분율 (RCA 지표)\n"
                 f"   ├─ [데이터베이스 영역] : {db_pct}%\n"
@@ -793,10 +871,12 @@ class DiagnosisWorker(QThread):
             res_root = conn.execute(root_query)
             while res_root.has_next():
                 cnt, method_name, ex_type = res_root.get_next()
-                root_data.append((str(cnt), str(method_name or ""), str(ex_type or "")))
+                root_data.append((f"{cnt:,}", str(method_name or ""), str(ex_type or "")))
 
             recent_data = []
-            recent_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
+            recent_query = (
+                "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
+            )
             res_recent = conn.execute(recent_query)
             while res_recent.has_next():
                 ts, method_name, ex_type = res_recent.get_next()
@@ -821,9 +901,7 @@ class DiagnosisWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(
-            "통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용) v1.1.0"
-        )
+        self.setWindowTitle("통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용) v1.2.0")
         self.setGeometry(100, 100, 1450, 950)
 
         self.db = None
@@ -851,14 +929,14 @@ class MainWindow(QMainWindow):
     def init_database_safely(self):
         self.close_db_connection()
         try:
-            self.db = kuzu.Database(DB_PATH)
+            self.db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
             self.conn = kuzu.Connection(self.db)
             create_schema(self.conn)
         except Exception as e:
             print(f"DB 연결 중 초기화 오류 재시도: {e}")
             time.sleep(0.3)
             self.close_db_connection()
-            self.db = kuzu.Database(DB_PATH)
+            self.db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
             self.conn = kuzu.Connection(self.db)
             create_schema(self.conn)
 
@@ -887,9 +965,7 @@ class MainWindow(QMainWindow):
             self.init_database_safely()
             self.reset_ui_components()
 
-            self.btn_upload.setText(
-                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-            )
+            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [대기 중]")
             self.lbl_status.setText("데이터베이스가 성공적으로 수동 초기화되었습니다.")
             self.progress_bar.setValue(0)
@@ -902,9 +978,7 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(6)
 
         top_bar = QHBoxLayout()
-        self.btn_upload = QPushButton(
-            "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-        )
+        self.btn_upload = QPushButton("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
         self.btn_upload.clicked.connect(self.upload_log)
         self.btn_upload.setStyleSheet(
             "background-color: #1e3d59; color: white; font-weight: bold; padding: 12px; font-size: 13px; border-radius: 4px;"
@@ -922,9 +996,7 @@ class MainWindow(QMainWindow):
 
         status_box = QHBoxLayout()
         self.lbl_detected_pattern = QLabel("🔍 감지된 로그 포맷: [대기 중]")
-        self.lbl_detected_pattern.setStyleSheet(
-            "color: #27ae60; font-weight: bold; font-size: 12px;"
-        )
+        self.lbl_detected_pattern.setStyleSheet("color: #27ae60; font-weight: bold; font-size: 12px;")
 
         self.lbl_status = QLabel("로그 파일을 선택하면 기존 DB를 자동 비우고 분석을 시작합니다.")
         self.lbl_status.setStyleSheet("color: #7f8c8d; font-style: italic;")
@@ -942,9 +1014,7 @@ class MainWindow(QMainWindow):
         top_report_box.setSpacing(2)
         top_report_box.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(
-            "<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>"
-        )
+        title_lbl = QLabel("<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>")
         title_lbl.setStyleSheet("margin: 0px; padding: 0px;")
         top_report_box.addWidget(title_lbl)
 
@@ -960,15 +1030,11 @@ class MainWindow(QMainWindow):
         chart_group = QVBoxLayout()
         chart_group.setSpacing(2)
 
-        chart_title = QLabel(
-            "<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>"
-        )
+        chart_title = QLabel("<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>")
         chart_group.addWidget(chart_title)
 
         chart_frame = QFrame()
-        chart_frame.setStyleSheet(
-            "background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;"
-        )
+        chart_frame.setStyleSheet("background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;")
         chart_grid = QGridLayout(chart_frame)
 
         chart_grid.setContentsMargins(4, 4, 4, 4)
@@ -1021,15 +1087,11 @@ class MainWindow(QMainWindow):
         bottom_layout = QHBoxLayout()
 
         bottom_left_box = QVBoxLayout()
-        bottom_left_box.addWidget(
-            QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>")
-        )
+        bottom_left_box.addWidget(QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>"))
         self.table_root = QTableWidget(0, 3)
         self.table_root.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_root.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_root.setHorizontalHeaderLabels(
-            ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
-        )
+        self.table_root.setHorizontalHeaderLabels(["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"])
         self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_root, 1)
 
@@ -1037,18 +1099,14 @@ class MainWindow(QMainWindow):
         self.table_recent = QTableWidget(0, 3)
         self.table_recent.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_recent.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_recent.setHorizontalHeaderLabels(
-            ["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"]
-        )
+        self.table_recent.setHorizontalHeaderLabels(["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"])
         self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_recent, 1)
 
         bottom_layout.addLayout(bottom_left_box, 1)
 
         bottom_right_box = QVBoxLayout()
-        bottom_right_box.addWidget(
-            QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>")
-        )
+        bottom_right_box.addWidget(QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>"))
         self.tree_view = QTreeView()
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
@@ -1107,16 +1165,14 @@ class MainWindow(QMainWindow):
 
                 if stack_trace:
                     st_item = QStandardItem("  📜 Stack Trace Sample")
-                    for line in str(stack_trace).split("\n")[:15]:
+                    for line in str(stack_trace).split("\n")[:25]:
                         st_item.appendRow(QStandardItem(f"      {line.strip()}"))
                     ex_item.appendRow(st_item)
 
                 root_node.appendRow(ex_item)
 
             if not has_data:
-                root_node.appendRow(
-                    QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다.")
-                )
+                root_node.appendRow(QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다."))
 
             calls_query = """
             MATCH (caller:Method)-[:CALLS]->(m:Method {fullName: $method_name})
@@ -1135,12 +1191,10 @@ class MainWindow(QMainWindow):
             print(f"전파 체인 로딩 오류: {e}")
 
     def upload_log(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)")
         if file_path:
             self.btn_upload.setEnabled(False)
-            self.btn_upload.setText("⏳ 이전 DB 초기화 및 새로운 로그 분석 진행 중...")
+            self.btn_upload.setText("⏳ 이전 DB 초기화 및 대용량 스트리밍 분석 진행 중...")
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [패턴 탐색 중...]")
             self.progress_bar.setValue(0)
 
@@ -1164,9 +1218,7 @@ class MainWindow(QMainWindow):
         if not is_success or parsed_count == 0:
             self.init_database_safely()
             self.btn_upload.setEnabled(True)
-            self.btn_upload.setText(
-                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-            )
+            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [인식 실패]")
             self.lbl_status.setText("⚠️ 분석 중단: 일치하는 패턴이 없거나 에러 로그가 없습니다.")
             self.progress_bar.setValue(0)
@@ -1183,20 +1235,16 @@ class MainWindow(QMainWindow):
 
         self.diag_worker = DiagnosisWorker(DB_PATH)
         self.diag_worker.finished.connect(
-            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(
-                report, r_data, rec_data, c_data, parsed_count
-            )
+            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(report, r_data, rec_data, c_data, parsed_count)
         )
         self.diag_worker.start()
 
-    def on_diagnosis_finished(
-        self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int
-    ):
+    def on_diagnosis_finished(self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int):
         self.init_database_safely()
 
         self.btn_upload.setEnabled(True)
         self.btn_upload.setText("✅ 분석 완료 (클릭하여 다른 파일 분석)")
-        self.lbl_status.setText(f"분석 완벽 종료! (총 {parsed_count}건의 예외 처리 완료)")
+        self.lbl_status.setText(f"분석 완벽 종료! (총 {parsed_count:,}건의 예외 처리 완료)")
 
         self.txt_summary.setText(report)
 
@@ -1229,36 +1277,29 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # 1. 커스텀 스플래시 창 생성 및 화면 표출 (600x410 고정 및 오버레이 레이아웃)
     splash = CustomSplashScreen("splash.png")
     splash.show()
     QApplication.processEvents()
 
-    # 2. PyInstaller 네이티브 스플래시 종료 (80ms 핸드오버 지연 버퍼 적용)
     def close_native_splash():
         if pyi_splash and pyi_splash.is_alive():
             pyi_splash.close()
 
     QTimer.singleShot(80, close_native_splash)
 
-    # 3. 메인 윈도우 인스턴스 생성 (초기 숨김 상태 유지)
     main_window = MainWindow()
 
-    # 4. 백그라운드 초기화 스레드 연결
     init_worker = InitWorker(main_window)
     init_worker.progress.connect(splash.update_progress)
 
     def _finish_loading():
-        # 메인 창 표시 및 OS 수준 렌더링 강제 완료 (더블 버퍼링 교체)
         main_window.show()
         main_window.update()
         QApplication.processEvents()
 
-        # 스플래시 창 안전 파기
         splash.close()
         splash.deleteLater()
 
-        # 메인 창 포커스 이동
         main_window.raise_()
         main_window.activateWindow()
 
