@@ -10,16 +10,21 @@
 
 ## ✨ 핵심 기능 (Key Features)
 
-- **Chunked Streaming & Low-Memory Ingestion**: 전체 로그를 한 번에 메모리에 올리지 않고 청크(Chunk, 5,000건 단위)별 분할 배치 스트리밍 처리를 수행합니다. 배치 완료 시 수동 Garabage Collection(`gc.collect()`)을 실행하여 수 GB 대용량 파일 분석 시에도 피크 RAM 점유를 1GB 이내로 안정적으로 제어합니다.
+- **Chunked Streaming & Low-Memory Ingestion**: 전체 로그를 한 번에 메모리에 올리지 않고 청크(Chunk, 5,000건 단위)별 분할 배치 스트리밍 처리를 수행합니다. 배치 완료 시 수동 Garbage Collection(`gc.collect()`)을 실행하여 수 GB 대용량 파일 분석 시에도 피크 RAM 점유를 1GB 이내로 안정적으로 제어합니다.
 
 - **2-Pass Node/Relationship Separation Ingestion**: 인덱스 탐색 병목 및 B+Tree 락 경합을 방지하기 위해 **[Pass 1: Node 선제 주입]** 후 **[Pass 2: Relationship 일괄 주입]** 구조로 데이터베이스 주입 파이프라인을 완전 분리했습니다.
+
 - **App-Level Global Caching**: 프로그램 동작 중 중복 생성되는 노드(`Thread`, `Class`, `Method`) 존재 여부를 파이썬 메모리 레벨에서 추적합니다. DB 단의 PK 중복 체크 연산을 전면 차단하여 벌크 주입 속도를 극대화했습니다.
+
 - **PyArrow Zero-Copy & Kùzu Buffer Pool Optimization**: Apache Arrow 메모리 구조에서 C++ 엔진인 Kùzu DB 버퍼로 Zero-Copy 직렬화 주입을 수행하며, DB 오픈 시 명시적 버퍼 풀 메모리 할당(예: 4GB)을 적용해 Disk I/O 병목을 근본적으로 제거했습니다.
+
 - **Trace Propagation Chain & QTreeView Event Binding**: 최다 발생 근본 원인(Root Cause) 및 최근 발생 랭킹 표의 항목을 클릭하면, 선택한 메서드의 상세 Exception 발생 이력, `Caused By` 뿌리 원인, 상세 `Stack Trace` 샘플, 상위 호출자(`CALLS`) 체인을 트리 구조(`QTreeView`)로 즉시 계층 렌더링합니다.
 
-- **Multi-WAS & Application Log Auto-Detection**: Spring Boot, Apache Tomcat/Log4j, WildFly/JBoss(server.log) 등 대표적인 3가지 로그 포맷을 정규표현식으로 자동 정밀 탐지하여 통합 분석합니다.
+- **Multi-WAS & Application Log Auto-Detection**: Spring Boot(2.x/3.x), Apache Tomcat/Log4j2/Logback, WildFly/JBoss(server.log), WebLogic/Generic WAS 등 대표적인 로그 포맷을 정규표현식으로 자동 정밀 탐지하여 통합 분석합니다.
 
-- **Auto-Diagnosis Engine (Post-Mortem Report)**: 수집된 예외 데이터를 분석하여 4대 장애 등급(🔴 DB 병목, ⚡ 외부 망/SFTP 유실, 🔑 인증/보안 결함, 💻 애플리케이션 로직 에러)을 분류하고 도메인별 지분율 산출 및 트러블슈팅 권고사항을 담은 사후 진단서를 자동 작성합니다.
+- **Auto-Diagnosis Engine (Post-Mortem Report)**: 수집된 예외 데이터를 정밀 분석하여 **9대 장애 등급**(🧠 JVM 메모리/자원 고갈, 🔴 DB 병목, ⚡ 스레드 풀/동시성 병목, 🌐 외부 연동망/SFTP, 📨 메시지 큐/캐시, 🔑 인증/보안 결함, ⚙️ 설정/배포 환경 예외, 📦 데이터 파싱/바인딩, 💻 애플리케이션 로직 에러)을 분류하고, 도메인별 지분율 산출(RCA 지표) 및 엔지니어 트러블슈팅 권고사항을 담은 사후 진단서를 자동 작성합니다.
+
+- **10-Step Timeline Distribution Chart**: 전체 장애 발생 기간을 10개 구간으로 자동 분할하고 구간별 에러 발생 건수 및 비율을 역순 정렬 타임라인 프로그레스 바로 한눈에 파악할 수 있도록 시각화합니다.
 
 - **Zero-Flicker Custom Splash Screen**: PyInstaller 네이티브 스플래시와 PyQt6 커스텀 오버레이 스플래시 간의 Seamless 핸드오버 지연 버퍼 기술을 적용하여 잔상/깜빡임 없는 깔끔한 로딩 UI 환경을 제공합니다.
 
@@ -55,16 +60,36 @@
 
 ---
 
+## 🚦 9대 장애 진단 분류 체계 (RCA Categories)
+
+시스템에서 분류하는 9가지 장애 등급과 주요 감지 예외 항목은 다음과 같습니다.
+
+| 장애 등급         | 분류 명칭                          | 주요 감지 예외 및 키워드 예시                                                                                      |
+| ----------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 🧠 **Category 1** | **JVM 메모리 및 시스템 자원 고갈** | `OutOfMemoryError`, `Metaspace`, `GC overhead limit`, `StackOverflowError`, `Too many open files`<br>              |
+| 🔴 **Category 2** | **데이터베이스 영역 (DB 병목)**    | `SQL`, `Hikari`, `Connection`, `Deadlock`, `Constraint`, `Timeout`<br>                                             |
+| ⚡ **Category 3** | **스레드 풀 및 동시성 병목**       | `RejectedExecutionException`, `TaskRejectedException`, `ThreadPoolExecutor`, `ConcurrentModificationException`<br> |
+| 🌐 **Category 4** | **외부 연동망 및 SFTP 장애**       | `ConnectException`, `SocketTimeout`, `HttpClient`, `UnknownHost`, `SFTP`<br>                                       |
+| 📨 **Category 5** | **메시지 큐 및 캐시 장애**         | `KafkaException`, `RedisConnectionException`, `AmqpException`, `RabbitMq`, `Jedis`, `Lettuce`<br>                  |
+| 🔑 **Category 6** | **인증 및 보안 장애**              | `Unauthorized`, `OAuth2`, `JWT`, `ExpiredToken`, `SignatureException`, `AccessDenied`<br>                          |
+| ⚙️ **Category 7** | **설정 및 배포/환경 예외**         | `BeanCreationException`, `ClassNotFoundException`, `NoSuchMethodError`, `YamlException`<br>                        |
+| 📦 **Category 8** | **데이터 파싱 / 바인딩 에러**      | `HttpMessageNotReadableException`, `JsonParseException`, `MethodArgumentNotValidException`<br>                     |
+| 💻 **Category 9** | **애플리케이션 로직 에러**         | 기타 일반 런타임 NullPointer 등 소스코드 내부 결함                                                                 |
+
+|
+
+---
+
 ## 🔄 파이프라인 및 아키텍처 (Architecture & Flow)
 
 로그 파일의 텍스트 스트림이 메모리 상에서 정제된 뒤 PyArrow를 거쳐 Kùzu DB 노드와 관계(Edge)로 고속 변환되는 고성능 파이프라인 프로세스입니다.
 
 ### 1. 처리 알고리즘 흐름
 
-```text
+````text
 [ 1. 파일 안전 해제 및 기존 Kùzu DB 안전 삭제/초기화 ]
                    ↓
-[ 2. 로그 패턴 자동 감지 (Spring Boot / Tomcat / WildFly) ]
+[ 2. 로그 패턴 자동 감지 (Spring Boot / Tomcat / WildFly / WebLogic) ]
                    ↓
 [ 3. 청크 단위 라인 스트리밍 파싱 (5,000 ERROR Context 단위) ]
                    ↓
@@ -76,19 +101,17 @@
                    ↓
 [ 7. 청크 메모리 초기화 및 명시적 GC(gc.collect()) 호출 ]
                    ↓
-[ 8. 인메모리 마이닝 기반 사후 진단 보고서 작성 (Post-Mortem Report) ]
+[ 8. 인메모리 마이닝 기반 9대 영역 장애 사후 진단서 작성 (Post-Mortem Report) ]
                    ↓
 [ 9. QTableWidget 랭킹 생성 & 셀 클릭 시 QTreeView 전파 체인 동적 로딩 ]
-
-```
+```[cite: 7, 8]
 
 ### 2. 지원하는 로그 포맷 예시
 
-1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`
-
-2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`
-
-3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`
+1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`[cite: 7, 8]
+2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`[cite: 7, 8]
+3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`[cite: 7, 8]
+4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`[cite: 7]
 
 ---
 
@@ -96,30 +119,28 @@
 
 ### 1. 필수 패키지 설치
 
-프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다.
+프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다[cite: 8].
 
 ```bash
 pip install PyQt6 kuzu pyarrow
-
-```
+```[cite: 8]
 
 ### 2. 프로젝트 실행
 
-구동 환경이 준비되면 메인 스크립트를 실행합니다.
+구동 환경이 준비되면 메인 스크립트를 실행합니다[cite: 8].
 
 ```bash
-python main.py
+python main_5.py
 
-```
+````
 
 ### 3. PyInstaller 단일 실행 파일 패키징 (바이너리 빌드)
 
 PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함된 원클릭 패키징 명령어입니다.
 
-```bash
-pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --splash splash.png --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
-
-```
+````bash
+pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --splash splash.png --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main_5.py
+```[cite: 8]
 
 ---
 
@@ -127,7 +148,7 @@ pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --sp
 
 ### 1. PyArrow 기반 2-Pass 노드/관계 분리 벌크 주입 (`LogParseWorker`)
 
-노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다.
+노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다[cite: 7, 8].
 
 ```python
 # Pass 1: Exception 노드 벌크 주입
@@ -152,40 +173,39 @@ o_table = pa.Table.from_arrays(
     names=["from", "to"],
 )
 conn.execute("COPY OCCURRED_IN FROM o_table")
-
-```
+```[cite: 7, 8]
 
 ### 2. Kùzu DB 버퍼 풀 할당 및 메모리 관리
 
-대용량 I/O 병목을 없애기 위해 Kùzu 데이터베이스 세션 연결 시 메모리 버퍼 풀 크기를 제어합니다.
+대용량 I/O 병목을 없애기 위해 Kùzu 데이터베이스 세션 연결 시 메모리 버퍼 풀 크기를 제어합니다[cite: 7, 8].
 
 ```python
 # Kùzu 버퍼 풀 메모리 4GB 할당 예시
 KUZU_BUFFER_POOL_SIZE = 4 * 1024 * 1024 * 1024
 db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
 conn = kuzu.Connection(db)
-
-```
+```[cite: 7, 8]
 
 ### 3. 셀 클릭을 통한 에러 전파 체인(`QTreeView`) 실시간 복원
 
-테이블 클릭 시 선택된 메서드의 `Exception`, `Caused By`, `StackTrace`, `CALLS` 관계를 Cypher 쿼리로 동적 조회하여 트리에 시각화합니다.
+테이블 클릭 시 선택된 메서드의 `Exception`, `Caused By`, `StackTrace`, `CALLS` 관계를 Cypher 쿼리로 동적 조회하여 트리에 시각화합니다[cite: 7, 8].
 
 ```python
-# Caused By 원인 분석 체인 및 호출 경로 조회[cite: 3]
+# Caused By 원인 분석 체인 및 호출 경로 조회
 cb_query = """
 MATCH (ex:Exception {id: $ex_id})-[:CAUSED_BY]->(child:Exception)
 RETURN child.type, child.message
 """
-res_cb = self.conn.execute(cb_query, {"ex_id": ex_id})
+res_cb = conn.execute(cb_query, {"ex_id": ex_id})
 while res_cb.has_next():
     c_type, c_msg = res_cb.get_next()
     ex_item.appendRow(QStandardItem(f"  └─ 💥 Caused by: {c_type}: {c_msg}"))
-
-```
+```[cite: 7, 8]
 
 ---
 
 ## 📄 라이선스 (License)
 
-이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다.
+이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다[cite: 8].
+
+````
