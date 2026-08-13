@@ -104,14 +104,14 @@
 [ 8. 인메모리 마이닝 기반 9대 영역 장애 사후 진단서 작성 (Post-Mortem Report) ]
                    ↓
 [ 9. QTableWidget 랭킹 생성 & 셀 클릭 시 QTreeView 전파 체인 동적 로딩 ]
-```[cite: 7, 8]
+```
 
 ### 2. 지원하는 로그 포맷 예시
 
-1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`[cite: 7, 8]
-2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`[cite: 7, 8]
-3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`[cite: 7, 8]
-4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`[cite: 7]
+1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`
+2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`
+3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`
+4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`
 
 ---
 
@@ -119,15 +119,15 @@
 
 ### 1. 필수 패키지 설치
 
-프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다[cite: 8].
+프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다.
 
 ```bash
 pip install PyQt6 kuzu pyarrow
-```[cite: 8]
+```
 
 ### 2. 프로젝트 실행
 
-구동 환경이 준비되면 메인 스크립트를 실행합니다[cite: 8].
+구동 환경이 준비되면 메인 스크립트를 실행합니다.
 
 ```bash
 python main_5.py
@@ -139,8 +139,8 @@ python main_5.py
 PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함된 원클릭 패키징 명령어입니다.
 
 ````bash
-pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --splash splash.png --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main_5.py
-```[cite: 8]
+pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --splash splash.png --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
+```
 
 ---
 
@@ -148,7 +148,7 @@ pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --sp
 
 ### 1. PyArrow 기반 2-Pass 노드/관계 분리 벌크 주입 (`LogParseWorker`)
 
-노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다[cite: 7, 8].
+노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다.
 
 ```python
 # Pass 1: Exception 노드 벌크 주입
@@ -173,22 +173,22 @@ o_table = pa.Table.from_arrays(
     names=["from", "to"],
 )
 conn.execute("COPY OCCURRED_IN FROM o_table")
-```[cite: 7, 8]
+```
 
 ### 2. Kùzu DB 버퍼 풀 할당 및 메모리 관리
 
-대용량 I/O 병목을 없애기 위해 Kùzu 데이터베이스 세션 연결 시 메모리 버퍼 풀 크기를 제어합니다[cite: 7, 8].
+대용량 I/O 병목을 없애기 위해 Kùzu 데이터베이스 세션 연결 시 메모리 버퍼 풀 크기를 제어합니다.
 
 ```python
 # Kùzu 버퍼 풀 메모리 4GB 할당 예시
 KUZU_BUFFER_POOL_SIZE = 4 * 1024 * 1024 * 1024
 db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
 conn = kuzu.Connection(db)
-```[cite: 7, 8]
+```
 
 ### 3. 셀 클릭을 통한 에러 전파 체인(`QTreeView`) 실시간 복원
 
-테이블 클릭 시 선택된 메서드의 `Exception`, `Caused By`, `StackTrace`, `CALLS` 관계를 Cypher 쿼리로 동적 조회하여 트리에 시각화합니다[cite: 7, 8].
+테이블 클릭 시 선택된 메서드의 `Exception`, `Caused By`, `StackTrace`, `CALLS` 관계를 Cypher 쿼리로 동적 조회하여 트리에 시각화합니다
 
 ```python
 # Caused By 원인 분석 체인 및 호출 경로 조회
@@ -200,12 +200,12 @@ res_cb = conn.execute(cb_query, {"ex_id": ex_id})
 while res_cb.has_next():
     c_type, c_msg = res_cb.get_next()
     ex_item.appendRow(QStandardItem(f"  └─ 💥 Caused by: {c_type}: {c_msg}"))
-```[cite: 7, 8]
+```
 
 ---
 
 ## 📄 라이선스 (License)
 
-이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다[cite: 8].
+이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다.
 
 ````
