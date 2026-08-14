@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import kuzu
 import pyarrow as pa
-from PyQt6.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QSharedMemory, QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -31,6 +31,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+# Windows 전용 포커스 이동을 위한 ctypes 임포트
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+
 # PyInstaller 네이티브 스플래시 라이브러리 모듈 임포트 시도
 try:
     import pyi_splash
@@ -43,7 +48,7 @@ KUZU_BUFFER_POOL_SIZE = 4 * 1024 * 1024 * 1024
 
 
 # ==============================================================================
-# 0. PyInstaller 동적 경로 및 인코딩/안전 삭제 헬퍼 함수
+# 0. PyInstaller 동적 경로 및 인코딩/안전 삭제/중복 실행 포커스 헬퍼 함수
 # ==============================================================================
 def get_resource_path(relative_path: str) -> str:
     """PyInstaller 동결(frozen) 환경과 일반 개발 환경 경로를 통합 처리하는 함수"""
@@ -100,17 +105,35 @@ def open_log_file(file_path: str):
         return open(file_path, "r", encoding="cp949", errors="ignore")
 
 
+def activate_existing_window(window_title_keyword: str):
+    """기존에 실행 중인 프로세스의 윈도우 창을 찾아 최상단으로 끌어오고 포커스 이동"""
+    if sys.platform == "win32":
+        user32 = ctypes.windll.user32
+
+        def enum_windows_callback(hwnd, extra):
+            if user32.IsWindowVisible(hwnd):
+                length = user32.GetWindowTextLengthW(hwnd)
+                buff = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buff, length + 1)
+                if window_title_keyword in buff.value:
+                    # 최소화 해제 및 최상단 포커스 이동
+                    SW_RESTORE = 9
+                    user32.ShowWindow(hwnd, SW_RESTORE)
+                    user32.SetForegroundWindow(hwnd)
+                    return False
+            return True
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+
+
 # ==============================================================================
 # 1. 커스텀 스플래시 윈도우 (단일 배경 이미지 및 하단 위젯 오버레이 적용)
 # ==============================================================================
 class CustomSplashScreen(QWidget):
     def __init__(self, image_path: str = "splash.png"):
         super().__init__()
-        self.setWindowFlags(
-            Qt.WindowType.Window
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         target_width = 600
@@ -149,9 +172,7 @@ class CustomSplashScreen(QWidget):
 
         self.lbl_status = QLabel("시스템 초기화 진행 중...")
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_status.setStyleSheet(
-            "color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;"
-        )
+        self.lbl_status.setStyleSheet("color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;")
         bottom_layout.addWidget(self.lbl_status)
 
         self.progress_bar = QProgressBar()
@@ -235,9 +256,7 @@ def create_schema(conn: kuzu.Connection):
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS Exception(id STRING, type STRING, message STRING, stackTrace STRING, timestamp TIMESTAMP, PRIMARY KEY (id))"
     )
-    conn.execute(
-        "CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))"
-    )
+    conn.execute("CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))")
     conn.execute("CREATE NODE TABLE IF NOT EXISTS Class(name STRING, PRIMARY KEY (name))")
 
     conn.execute("CREATE REL TABLE IF NOT EXISTS RAISED(FROM Thread TO Exception)")
@@ -415,23 +434,17 @@ class LogParseWorker(QThread):
 
                 new_threads = chunk_threads_set - global_threads_set
                 if new_threads:
-                    t_table = pa.Table.from_arrays(
-                        [pa.array(list(new_threads), type=pa.string())], names=["name"]
-                    )
+                    t_table = pa.Table.from_arrays([pa.array(list(new_threads), type=pa.string())], names=["name"])
                     conn.execute("COPY Thread FROM t_table")
                     global_threads_set.update(new_threads)
 
                 new_classes = chunk_classes_set - global_classes_set
                 if new_classes:
-                    c_table = pa.Table.from_arrays(
-                        [pa.array(list(new_classes), type=pa.string())], names=["name"]
-                    )
+                    c_table = pa.Table.from_arrays([pa.array(list(new_classes), type=pa.string())], names=["name"])
                     conn.execute("COPY Class FROM c_table")
                     global_classes_set.update(new_classes)
 
-                new_methods_dict = {
-                    k: v for k, v in chunk_methods_dict.items() if k not in global_methods_set
-                }
+                new_methods_dict = {k: v for k, v in chunk_methods_dict.items() if k not in global_methods_set}
                 if new_methods_dict:
                     m_full = [v[0] for v in new_methods_dict.values()]
                     m_name = [v[1] for v in new_methods_dict.values()]
@@ -609,9 +622,7 @@ class LogParseWorker(QThread):
 
                     match = detected_pattern["re"].match(line)
                     if match:
-                        clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern[
-                            "parse"
-                        ](match)
+                        clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern["parse"](match)
 
                         if log_level in ["ERROR", "FATAL", "CRITICAL", "EMERGENCY"]:
                             if current_ctx:
@@ -676,9 +687,7 @@ class LogParseWorker(QThread):
                                     is_fw = class_name.startswith(FRAMEWORK_PACKAGES)
 
                                     if len(current_ctx["call_chain"]) < 30:
-                                        current_ctx["call_chain"].append(
-                                            (class_name, method_name, full_method, is_fw)
-                                        )
+                                        current_ctx["call_chain"].append((class_name, method_name, full_method, is_fw))
 
                             elif line.startswith("\t") or line.startswith("   "):
                                 if len(current_ctx["raw_stack_trace_lines"]) < 25:
@@ -738,16 +747,8 @@ class DiagnosisWorker(QThread):
 
             chart_10step_data = []
             try:
-                dt_start = (
-                    datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
-                    if isinstance(start_t, str)
-                    else start_t
-                )
-                dt_end = (
-                    datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
-                    if isinstance(end_t, str)
-                    else end_t
-                )
+                dt_start = datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(start_t, str) else start_t
+                dt_end = datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(end_t, str) else end_t
                 total_duration = (dt_end - dt_start).total_seconds()
 
                 if total_duration <= 0:
@@ -822,10 +823,7 @@ class DiagnosisWorker(QThread):
                     ]
                 ):
                     oom_cnt += cnt
-                elif any(
-                    k in str_type or k in str_msg
-                    for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
-                ):
+                elif any(k in str_type or k in str_msg for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]):
                     db_cnt += cnt
                 elif any(
                     k in str_type or k in str_msg
@@ -900,7 +898,6 @@ class DiagnosisWorker(QThread):
                 else:
                     app_cnt += cnt
 
-            # [Fix] 오타 수정: auth_pct 계산 시 우변의 변수를 auth_cnt 로 교체
             oom_pct = int((oom_cnt / total_cnt) * 100) if total_cnt > 0 else 0
             db_pct = int((db_cnt / total_cnt) * 100) if total_cnt > 0 else 0
             thread_pct = int((thread_cnt / total_cnt) * 100) if total_cnt > 0 else 0
@@ -910,14 +907,10 @@ class DiagnosisWorker(QThread):
             cfg_pct = int((cfg_cnt / total_cnt) * 100) if total_cnt > 0 else 0
             parse_pct = int((parse_cnt / total_cnt) * 100) if total_cnt > 0 else 0
 
-            used_sum = (
-                oom_pct + db_pct + thread_pct + net_pct + mq_pct + auth_pct + cfg_pct + parse_pct
-            )
+            used_sum = oom_pct + db_pct + thread_pct + net_pct + mq_pct + auth_pct + cfg_pct + parse_pct
             app_pct = max(0, 100 - used_sum)
 
-            max_pct = max(
-                oom_pct, db_pct, thread_pct, net_pct, mq_pct, auth_pct, cfg_pct, parse_pct, app_pct
-            )
+            max_pct = max(oom_pct, db_pct, thread_pct, net_pct, mq_pct, auth_pct, cfg_pct, parse_pct, app_pct)
             diagnosis_tag, recommendation = "", ""
 
             if max_pct == oom_pct and oom_pct > 0:
@@ -927,9 +920,7 @@ class DiagnosisWorker(QThread):
                 diagnosis_tag = "🔴 DATABASE BOTTLE_NECK (데이터베이스 장애)"
                 recommendation = "   1. [커넥션 풀 고갈]: HikariCP/DataSource 커넥션 점유 점검.\n   2. [슬로우 쿼리]: 대형 조인 및 인덱스 누락 점검."
             elif max_pct == thread_pct and thread_pct > 0:
-                diagnosis_tag = (
-                    "⚡ THREAD POOL & CONCURRENCY BOTTLE_NECK (스레드 풀 고갈 및 동시성 병목)"
-                )
+                diagnosis_tag = "⚡ THREAD POOL & CONCURRENCY BOTTLE_NECK (스레드 풀 고갈 및 동시성 병목)"
                 recommendation = "   1. [Async Thread Pool]: @Async 및 TaskExecutor의 corePoolSize / queueCapacity 재설정.\n   2. [Backpressure]: 순간 유입 트래픽 제어를 위한 Rate Limiter 도입 검토."
             elif max_pct == net_pct and net_pct > 0:
                 diagnosis_tag = "⚡ EXTERNAL NETWORK OUTAGE (외부 연동망 및 SFTP/네트워크 장애)"
@@ -982,7 +973,9 @@ class DiagnosisWorker(QThread):
                 root_data.append((f"{cnt:,}", str(method_name or ""), str(ex_type or "")))
 
             recent_data = []
-            recent_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
+            recent_query = (
+                "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
+            )
             res_recent = conn.execute(recent_query)
             while res_recent.has_next():
                 ts, method_name, ex_type = res_recent.get_next()
@@ -1051,9 +1044,7 @@ class TreeLoadWorker(QThread):
                 root_node.appendRow(ex_item)
 
             if not has_data:
-                root_node.appendRow(
-                    QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다.")
-                )
+                root_node.appendRow(QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다."))
 
             calls_query = """
             MATCH (caller:Method)-[:CALLS]->(m:Method {fullName: $method_name})
@@ -1082,11 +1073,11 @@ class TreeLoadWorker(QThread):
 # 7. 메인 윈도우 클래스
 # ==============================================================================
 class MainWindow(QMainWindow):
+    WINDOW_TITLE = "통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용) v1.3.0"
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(
-            "통합 WAS/애플리케이션 로그 자동 분석기 (고속 Bulk Insert 엔진 적용) v1.3.0"
-        )
+        self.setWindowTitle(self.WINDOW_TITLE)
         self.setGeometry(100, 100, 1450, 950)
 
         self.db = None
@@ -1151,9 +1142,7 @@ class MainWindow(QMainWindow):
             self.init_database_safely()
             self.reset_ui_components()
 
-            self.btn_upload.setText(
-                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-            )
+            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [대기 중]")
             self.lbl_status.setText("데이터베이스가 성공적으로 수동 초기화되었습니다.")
             self.progress_bar.setValue(0)
@@ -1166,9 +1155,7 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(6)
 
         top_bar = QHBoxLayout()
-        self.btn_upload = QPushButton(
-            "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-        )
+        self.btn_upload = QPushButton("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
         self.btn_upload.clicked.connect(self.upload_log)
         self.btn_upload.setStyleSheet(
             "background-color: #1e3d59; color: white; font-weight: bold; padding: 12px; font-size: 13px; border-radius: 4px;"
@@ -1186,9 +1173,7 @@ class MainWindow(QMainWindow):
 
         status_box = QHBoxLayout()
         self.lbl_detected_pattern = QLabel("🔍 감지된 로그 포맷: [대기 중]")
-        self.lbl_detected_pattern.setStyleSheet(
-            "color: #27ae60; font-weight: bold; font-size: 12px;"
-        )
+        self.lbl_detected_pattern.setStyleSheet("color: #27ae60; font-weight: bold; font-size: 12px;")
 
         self.lbl_status = QLabel("로그 파일을 선택하면 기존 DB를 자동 비우고 분석을 시작합니다.")
         self.lbl_status.setStyleSheet("color: #7f8c8d; font-style: italic;")
@@ -1206,9 +1191,7 @@ class MainWindow(QMainWindow):
         top_report_box.setSpacing(2)
         top_report_box.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(
-            "<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>"
-        )
+        title_lbl = QLabel("<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>")
         title_lbl.setStyleSheet("margin: 0px; padding: 0px;")
         top_report_box.addWidget(title_lbl)
 
@@ -1224,15 +1207,11 @@ class MainWindow(QMainWindow):
         chart_group = QVBoxLayout()
         chart_group.setSpacing(2)
 
-        chart_title = QLabel(
-            "<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>"
-        )
+        chart_title = QLabel("<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>")
         chart_group.addWidget(chart_title)
 
         chart_frame = QFrame()
-        chart_frame.setStyleSheet(
-            "background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;"
-        )
+        chart_frame.setStyleSheet("background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;")
         chart_grid = QGridLayout(chart_frame)
 
         chart_grid.setContentsMargins(4, 4, 4, 4)
@@ -1285,15 +1264,11 @@ class MainWindow(QMainWindow):
         bottom_layout = QHBoxLayout()
 
         bottom_left_box = QVBoxLayout()
-        bottom_left_box.addWidget(
-            QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>")
-        )
+        bottom_left_box.addWidget(QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>"))
         self.table_root = QTableWidget(0, 3)
         self.table_root.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_root.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_root.setHorizontalHeaderLabels(
-            ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
-        )
+        self.table_root.setHorizontalHeaderLabels(["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"])
         self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_root, 1)
 
@@ -1301,18 +1276,14 @@ class MainWindow(QMainWindow):
         self.table_recent = QTableWidget(0, 3)
         self.table_recent.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_recent.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_recent.setHorizontalHeaderLabels(
-            ["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"]
-        )
+        self.table_recent.setHorizontalHeaderLabels(["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"])
         self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_recent, 1)
 
         bottom_layout.addLayout(bottom_left_box, 1)
 
         bottom_right_box = QVBoxLayout()
-        bottom_right_box.addWidget(
-            QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>")
-        )
+        bottom_right_box.addWidget(QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>"))
         self.tree_view = QTreeView()
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
@@ -1341,9 +1312,7 @@ class MainWindow(QMainWindow):
         self.tree_model.clear()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
 
-        loading_node = QStandardItem(
-            f"⏳ Target Method ({method_name}) 상세 전파 체인 불러오는 중..."
-        )
+        loading_node = QStandardItem(f"⏳ Target Method ({method_name}) 상세 전파 체인 불러오는 중...")
         self.tree_model.appendRow(loading_node)
 
         self.close_db_connection()
@@ -1359,9 +1328,7 @@ class MainWindow(QMainWindow):
         self.tree_view.expandAll()
 
     def upload_log(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)")
         if file_path:
             self.btn_upload.setEnabled(False)
             self.btn_upload.setText("⏳ 이전 DB 초기화 및 대용량 스트리밍 분석 진행 중...")
@@ -1388,9 +1355,7 @@ class MainWindow(QMainWindow):
         if not is_success or parsed_count == 0:
             self.init_database_safely()
             self.btn_upload.setEnabled(True)
-            self.btn_upload.setText(
-                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
-            )
+            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [인식 실패]")
             self.lbl_status.setText("⚠️ 분석 중단: 일치하는 패턴이 없거나 에러 로그가 없습니다.")
             self.progress_bar.setValue(0)
@@ -1407,15 +1372,11 @@ class MainWindow(QMainWindow):
 
         self.diag_worker = DiagnosisWorker(DB_PATH)
         self.diag_worker.finished.connect(
-            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(
-                report, r_data, rec_data, c_data, parsed_count
-            )
+            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(report, r_data, rec_data, c_data, parsed_count)
         )
         self.diag_worker.start()
 
-    def on_diagnosis_finished(
-        self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int
-    ):
+    def on_diagnosis_finished(self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int):
         self.init_database_safely()
 
         self.btn_upload.setEnabled(True)
@@ -1448,11 +1409,28 @@ class MainWindow(QMainWindow):
 
 
 # ==============================================================================
-# 8. 애플리케이션 실행 진입점
+# 8. 애플리케이션 실행 진입점 (중복 실행 방지 및 포커스 전환 처리)
 # ==============================================================================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
+    # 1. 고유 키 기반 QSharedMemory 단일 인스턴스 검증
+    shared_memory_key = "Unique_Log_Analyzer_Single_Instance_Key_v130"
+    shared_memory = QSharedMemory(shared_memory_key)
+
+    # 메모리에 이미 연결할 수 있다면 -> 프로세스가 이미 실행 중임
+    if not shared_memory.create(1):
+        # PyInstaller C-native 스플래시가 노출되어 있다면 즉시 종료
+        if pyi_splash and pyi_splash.is_alive():
+            pyi_splash.close()
+
+        # 기존 윈도우 창을 탐색하여 화면 전면으로 끌어오고 포커스 부여
+        activate_existing_window("통합 WAS/애플리케이션 로그 자동 분석기")
+
+        # CustomSplashScreen 객체 생성 조차 수행하지 않고 프로세스 종료
+        sys.exit(0)
+
+    # 2. 첫 실행인 경우: 스플래시 윈도우 표시 및 앱 정상 초기화
     splash = CustomSplashScreen("splash.png")
     splash.show()
     QApplication.processEvents()

@@ -139,7 +139,7 @@ python main_5.py
 PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함된 원클릭 패키징 명령어입니다.
 
 ````bash
-pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --splash splash.png --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
+pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
 ```
 
 ---
