@@ -1,0 +1,24 @@
+[project]
+name = "tomcat-graph-based-rca-analyzer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "kspark", email = "kspark.prj@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "kuzu>=0.11.3,<1.0.0",
+    "pyarrow>=17.0.0",
+    "pyinstaller>=6.21.0,<7.0.0",
+    "pyqt6>=6.7.1,<7.0.0",
+    "requests>=2.31.0,<3.0.0",
+    "urllib3>=2.2.0,<3.0.0",
+]
+
+[project.scripts]
+tomcat-graph-based-rca-analyzer = "tomcat_graph_based_rca_analyzer:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
