@@ -10,6 +10,7 @@ kuzu_unified_log_db
 # PyInstaller build artifacts
 build/
 dist/
+test_git_repo/
 
 # Compiled Rust extension (.pyd / .so)
 *.pyd
@@ -21,6 +22,7 @@ dist/
 .idea/
 *.swp
 *.swo
+catalina_test.log
 
 # OS files
 Thumbs.db
