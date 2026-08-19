@@ -8,17 +8,20 @@ from datetime import datetime, timedelta
 
 import kuzu
 import pyarrow as pa
-from PyQt6.QtCore import QSharedMemory, QSize, Qt, QThread, QTimer, pyqtSignal
+import subprocess
+from PyQt6.QtCore import QModelIndex, QSharedMemory, QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QDialog,
     QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -30,6 +33,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 
 # Windows 전용 포커스 이동을 위한 ctypes 임포트
 if sys.platform == "win32":
@@ -995,6 +999,201 @@ class DiagnosisWorker(QThread):
 
 
 # ==============================================================================
+# 5-1. Git 로컬 히스토리 팝업 레이어 (GitHistoryDialog)
+# ==============================================================================
+class GitHistoryDialog(QDialog):
+    def __init__(self, git_path: str, class_full_name: str, method_name: str, parent=None):
+        super().__init__(parent)
+        self.git_path = git_path
+        self.class_full_name = class_full_name
+        self.method_name = method_name
+        
+        self.setWindowTitle(f"Git History - {class_full_name.split('.')[-1]}")
+        self.resize(850, 500)
+        self.setup_ui()
+        self.load_git_history()
+
+    def setup_ui(self):
+        self.setStyleSheet(
+            """
+            QDialog { background-color: #23272e; color: #dcdde1; }
+            QLabel { color: #dcdde1; font-size: 12px; }
+            QTableWidget {
+                background-color: #2f3640;
+                color: #f5f6fa;
+                gridline-color: #1e222b;
+                border: 1px solid #1e222b;
+                font-size: 11px;
+            }
+            QHeaderView::section {
+                background-color: #1e222b;
+                color: #f5f6fa;
+                padding: 6px;
+                border: 1px solid #2f3640;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton {
+                background-color: #34495e;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #415b76;
+            }
+            """
+        )
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        
+        # 상단 정보 레이블
+        info_layout = QGridLayout()
+        info_layout.setSpacing(6)
+        
+        lbl_class_title = QLabel("<b>클래스 풀네임:</b>")
+        self.lbl_class_val = QLabel(self.class_full_name)
+        self.lbl_class_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        
+        lbl_method_title = QLabel("<b>메소드명:</b>")
+        self.lbl_method_val = QLabel(self.method_name)
+        self.lbl_method_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        
+        lbl_file_title = QLabel("<b>로컬 파일 경로:</b>")
+        self.lbl_file_val = QLabel("검색 중...")
+        self.lbl_file_val.setStyleSheet("color: #00d2d3;")
+        self.lbl_file_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        
+        info_layout.addWidget(lbl_class_title, 0, 0)
+        info_layout.addWidget(self.lbl_class_val, 0, 1)
+        info_layout.addWidget(lbl_method_title, 1, 0)
+        info_layout.addWidget(self.lbl_method_val, 1, 1)
+        info_layout.addWidget(lbl_file_title, 2, 0)
+        info_layout.addWidget(self.lbl_file_val, 2, 1)
+        
+        layout.addLayout(info_layout)
+        
+        # Git 기록 테이블
+        self.table = QTableWidget(0, 5)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setHorizontalHeaderLabels(["SHA", "작성자 (Author)", "이메일 (Email)", "날짜 (Date)", "커밋 메시지 (Commit Message)"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        
+        layout.addWidget(self.table)
+        
+        # 하단 닫기 버튼
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+        btn_close = QPushButton("닫기")
+        btn_close.clicked.connect(self.accept)
+        btn_box.addWidget(btn_close)
+        layout.addLayout(btn_box)
+
+    def load_git_history(self):
+        relative_file_path = self.find_file_in_git(self.git_path, self.class_full_name)
+        if not relative_file_path:
+            self.lbl_file_val.setText("로컬 Git 저장소 내에서 해당 소스 파일을 찾을 수 없습니다.")
+            self.lbl_file_val.setStyleSheet("color: #ff6e40;")
+            return
+            
+        full_file_path = os.path.join(self.git_path, relative_file_path).replace("\\", "/")
+        self.lbl_file_val.setText(full_file_path)
+        self.lbl_file_val.setStyleSheet("color: #27ae60;")
+        
+        try:
+            cmd = [
+                "git", "log",
+                "--follow",
+                "-n", "30",
+                "--pretty=format:%h|%an|%ae|%ad|%s",
+                "--date=short",
+                "--",
+                relative_file_path
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                cwd=self.git_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            
+            if result.returncode != 0:
+                self.lbl_file_val.setText(f"Git 로그 조회 실패: {result.stderr.strip()}")
+                self.lbl_file_val.setStyleSheet("color: #ff6e40;")
+                return
+                
+            lines = result.stdout.splitlines()
+            self.table.setSortingEnabled(False)
+            self.table.setRowCount(0)
+            for row_idx, line in enumerate(lines):
+                parts = line.split("|", 4)
+                if len(parts) < 5:
+                    parts = parts + [""] * (5 - len(parts))
+                
+                sha, author, email, date, msg = parts
+                
+                self.table.insertRow(row_idx)
+                self.table.setItem(row_idx, 0, QTableWidgetItem(sha))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(author))
+                self.table.setItem(row_idx, 2, QTableWidgetItem(email))
+                self.table.setItem(row_idx, 3, QTableWidgetItem(date))
+                self.table.setItem(row_idx, 4, QTableWidgetItem(msg))
+            self.table.setSortingEnabled(True)
+                
+        except Exception as e:
+            self.lbl_file_val.setText(f"Git 실행 오류: {e}")
+            self.lbl_file_val.setStyleSheet("color: #ff6e40;")
+
+    def find_file_in_git(self, git_path: str, class_full_name: str) -> str | None:
+        path_suffix = class_full_name.replace(".", "/")
+        class_simple_name = class_full_name.split(".")[-1]
+        
+        try:
+            result = subprocess.run(
+                ["git", "ls-files"],
+                cwd=git_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            if result.returncode != 0:
+                return None
+                
+            files = result.stdout.splitlines()
+            
+            # 1차 매칭: 패키지 경로 일치
+            for f in files:
+                f_no_ext, _ = os.path.splitext(f)
+                if f_no_ext.replace("\\", "/").endswith(path_suffix):
+                    return f
+                    
+            # 2차 매칭: 단순 클래스명 매칭
+            for f in files:
+                f_no_ext, _ = os.path.splitext(f)
+                if os.path.basename(f_no_ext) == class_simple_name:
+                    return f
+                    
+        except Exception as e:
+            print(f"Git 파일 검색 오류: {e}")
+            
+        return None
+
+
+# ==============================================================================
 # 6. 비동기 트리 뷰 데이터 로더 Thread
 # ==============================================================================
 class TreeLoadWorker(QThread):
@@ -1171,6 +1370,31 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.btn_reset, 1)
         main_layout.addLayout(top_bar)
 
+        # Git 로컬 경로 입력 창 추가
+        git_bar = QHBoxLayout()
+        git_bar.setSpacing(6)
+        
+        lbl_git_path = QLabel("<b>📁 Git 로컬 경로:</b>")
+        lbl_git_path.setStyleSheet("font-size: 12px; color: #dcdde1;")
+        
+        self.txt_git_path = QLineEdit()
+        self.txt_git_path.setPlaceholderText("예: C:/Users/name/workspace/tomcat (로컬 Git 저장소 경로 등록 시 상세 분석 체인 클릭하여 Git 히스토리 조회 가능)")
+        self.txt_git_path.setStyleSheet(
+            "background-color: #2f3640; color: #f5f6fa; border: 1px solid #1e222b; padding: 6px; border-radius: 4px; font-size: 12px;"
+        )
+        
+        btn_git_browse = QPushButton("📁 경로 선택")
+        btn_git_browse.clicked.connect(self.browse_git_path)
+        btn_git_browse.setStyleSheet(
+            "background-color: #34495e; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 12px;"
+        )
+        
+        git_bar.addWidget(lbl_git_path)
+        git_bar.addWidget(self.txt_git_path, 1)
+        git_bar.addWidget(btn_git_browse)
+        
+        main_layout.addLayout(git_bar)
+
         status_box = QHBoxLayout()
         self.lbl_detected_pattern = QLabel("🔍 감지된 로그 포맷: [대기 중]")
         self.lbl_detected_pattern.setStyleSheet("color: #27ae60; font-weight: bold; font-size: 12px;")
@@ -1296,6 +1520,7 @@ class MainWindow(QMainWindow):
 
         self.table_root.cellClicked.connect(self.on_root_table_clicked)
         self.table_recent.cellClicked.connect(self.on_recent_table_clicked)
+        self.tree_view.clicked.connect(self.on_tree_view_clicked)
 
     def on_root_table_clicked(self, row: int, column: int):
         item = self.table_root.item(row, 1)
@@ -1306,6 +1531,43 @@ class MainWindow(QMainWindow):
         item = self.table_recent.item(row, 1)
         if item:
             self.load_error_propagation_chain(item.text())
+
+    def browse_git_path(self):
+        path = QFileDialog.getExistingDirectory(self, "Git 로컬 저장소 디렉토리 선택")
+        if path:
+            self.txt_git_path.setText(path)
+
+    def on_tree_view_clicked(self, index: QModelIndex):
+        git_path = self.txt_git_path.text().strip()
+        if not git_path:
+            return
+            
+        item = self.tree_model.itemFromIndex(index)
+        if not item:
+            return
+            
+        text = item.text()
+        method_name = None
+        
+        if text.startswith("🎯 Target Method:"):
+            method_name = text.replace("🎯 Target Method:", "").strip()
+        elif "⬆️ Called By:" in text:
+            method_name = text.split("⬆️ Called By:")[-1].strip()
+            
+        if method_name:
+            self.show_git_history_popup(git_path, method_name)
+
+    def show_git_history_popup(self, git_path: str, method_name: str):
+        parts = method_name.split(".")
+        if len(parts) >= 2:
+            class_full_name = ".".join(parts[:-1])
+            method_only = parts[-1]
+        else:
+            class_full_name = method_name
+            method_only = ""
+            
+        dialog = GitHistoryDialog(git_path, class_full_name, method_only, self)
+        dialog.exec()
 
     def load_error_propagation_chain(self, method_name: str):
         """UI Freeze 방지를 위한 비동기 QThread 스택트레이스 로딩 처리"""
