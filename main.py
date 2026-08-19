@@ -4,6 +4,7 @@ import re
 import shutil
 import sys
 import time
+import html
 from datetime import datetime, timedelta
 
 import kuzu
@@ -28,6 +29,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QTextEdit,
     QTreeView,
     QVBoxLayout,
@@ -999,6 +1001,97 @@ class DiagnosisWorker(QThread):
 
 
 # ==============================================================================
+# 5-0. Git 디프(Diff) 팝업 레이어 (GitDiffDialog)
+# ==============================================================================
+class GitDiffDialog(QDialog):
+    def __init__(self, sha: str, file_path: str, diff_text: str, parent=None):
+        super().__init__(parent)
+        self.sha = sha
+        self.file_path = file_path
+        self.diff_text = diff_text
+        
+        self.setWindowTitle(f"Git Diff - {os.path.basename(file_path)} ({sha})")
+        self.resize(900, 600)
+        self.setup_ui()
+        
+    def setup_ui(self):
+        self.setStyleSheet(
+            """
+            QDialog { background-color: #1e1e1e; color: #d4d4d4; }
+            QPushButton {
+                background-color: #3e3e42;
+                color: #f1f1f1;
+                font-weight: bold;
+                padding: 6px 12px;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #505054;
+            }
+            """
+        )
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        
+        # 정보 라벨
+        lbl_info = QLabel(f"<b>📄 파일:</b> {self.file_path} (Commit: {self.sha})")
+        lbl_info.setStyleSheet("color: #9cdcfe; font-size: 12px;")
+        layout.addWidget(lbl_info)
+        
+        # Diff 표시용 QTextBrowser
+        self.text_browser = QTextBrowser()
+        self.text_browser.setStyleSheet(
+            """
+            QTextBrowser {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                border: 1px solid #3e3e42;
+                font-family: Consolas, 'Courier New', monospace;
+                font-size: 12px;
+            }
+            """
+        )
+        
+        # HTML 렌더링을 통한 + - 색상 구분
+        html_lines = []
+        lines = self.diff_text.splitlines()
+        for line in lines:
+            escaped_line = html.escape(line)
+            # + 와 - 의 색상을 다르게 스타일링
+            if line.startswith('+') and not line.startswith('+++'):
+                html_lines.append(f'<div style="color: #4ec9b0; background-color: #1e3d2f; font-weight: bold;">{escaped_line}</div>')
+            elif line.startswith('-') and not line.startswith('---'):
+                html_lines.append(f'<div style="color: #f44747; background-color: #3d1e1e; font-weight: bold;">{escaped_line}</div>')
+            elif line.startswith('@@'):
+                html_lines.append(f'<div style="color: #569cd6; background-color: #2d2d30;">{escaped_line}</div>')
+            elif line.startswith('diff --git') or line.startswith('index ') or line.startswith('--- ') or line.startswith('+++ '):
+                html_lines.append(f'<div style="color: #858585; font-weight: bold;">{escaped_line}</div>')
+            else:
+                html_lines.append(f'<div style="color: #d4d4d4;">{escaped_line}</div>')
+                
+        html_content = (
+            f"<div style='font-family: Consolas, \"Courier New\", monospace; white-space: pre; line-height: 120%;'>"
+            f"{''.join(html_lines)}"
+            f"</div>"
+        )
+        self.text_browser.setHtml(html_content)
+        
+        layout.addWidget(self.text_browser)
+        
+        # 하단 닫기 버튼
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+        btn_close = QPushButton("닫기")
+        btn_close.clicked.connect(self.accept)
+        btn_box.addWidget(btn_close)
+        layout.addLayout(btn_box)
+
+
+# ==============================================================================
 # 5-1. Git 로컬 히스토리 팝업 레이어 (GitHistoryDialog)
 # ==============================================================================
 class GitHistoryDialog(QDialog):
@@ -1012,7 +1105,7 @@ class GitHistoryDialog(QDialog):
         self.resize(850, 500)
         self.setup_ui()
         self.load_git_history()
-
+ 
     def setup_ui(self):
         self.setStyleSheet(
             """
@@ -1084,6 +1177,7 @@ class GitHistoryDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["SHA", "작성자 (Author)", "이메일 (Email)", "날짜 (Date)", "커밋 메시지 (Commit Message)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
         
         layout.addWidget(self.table)
         
@@ -1112,7 +1206,7 @@ class GitHistoryDialog(QDialog):
                 "--follow",
                 "-n", "30",
                 "--pretty=format:%h|%an|%ae|%ad|%s",
-                "--date=short",
+                "--date=format:%Y-%m-%d %H:%M:%S",
                 "--",
                 relative_file_path
             ]
@@ -1150,6 +1244,7 @@ class GitHistoryDialog(QDialog):
                 self.table.setItem(row_idx, 3, QTableWidgetItem(date))
                 self.table.setItem(row_idx, 4, QTableWidgetItem(msg))
             self.table.setSortingEnabled(True)
+            self.table.sortByColumn(3, Qt.SortOrder.DescendingOrder)
                 
         except Exception as e:
             self.lbl_file_val.setText(f"Git 실행 오류: {e}")
@@ -1191,6 +1286,59 @@ class GitHistoryDialog(QDialog):
             print(f"Git 파일 검색 오류: {e}")
             
         return None
+
+    def on_cell_double_clicked(self, row, col):
+        sha_item = self.table.item(row, 0)
+        if not sha_item:
+            return
+        sha = sha_item.text().strip()
+        
+        relative_file_path = self.find_file_in_git(self.git_path, self.class_full_name)
+        if not relative_file_path:
+            QMessageBox.warning(self, "오류", "로컬 Git 저장소 내에서 해당 소스 파일을 찾을 수 없습니다.")
+            return
+            
+        try:
+            # 이전 커밋(sha~1)과 현재 커밋(sha)의 비교 시도
+            cmd = ["git", "diff", f"{sha}~1", sha, "--", relative_file_path]
+            result = subprocess.run(
+                cmd,
+                cwd=self.git_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            
+            # 만약 첫 번째 커밋이라 sha~1이 없다면 전체 내용을 diff 형식으로 보여주기 위해 git show를 실행
+            if result.returncode != 0:
+                cmd = ["git", "show", sha, "--", relative_file_path]
+                result = subprocess.run(
+                    cmd,
+                    cwd=self.git_path,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                )
+                
+            if result.returncode != 0:
+                QMessageBox.warning(self, "오류", f"diff를 가져오지 못했습니다:\n{result.stderr.strip()}")
+                return
+                
+            diff_output = result.stdout
+            if not diff_output.strip():
+                diff_output = "변경 사항이 없습니다."
+                
+            dialog = GitDiffDialog(sha, relative_file_path, diff_output, self)
+            dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"Git 명령 실행 오류: {e}")
 
 
 # ==============================================================================
