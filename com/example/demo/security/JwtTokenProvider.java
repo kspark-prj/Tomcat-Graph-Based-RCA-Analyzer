@@ -1,0 +1,1 @@
+public class JwtTokenProvider { public void validateToken() {} }
