@@ -1,14 +1,20 @@
 # 😾 WAS/Application Log Graph-Based RCA Analyzer
 
-> **Graph Database Engine (Kùzu) & PyArrow Streaming Bulk Ingestion Powered High-Performance Log RCA Tool**
+> **Graph Database Engine (Kùzu) & PyArrow Streaming Bulk Ingestion Powered High-Performance Log RCA & Git History Tracking Tool**
 
-`WAS/Application Log Graph-Based RCA Analyzer`는 Spring Boot, Apache Tomcat, WildFly/JBoss 등 다양한 WAS 및 애플리케이션의 대용량 로그 파일(`*.log`, `*.out`)을 분석하여 장애 원인을 그래프 데이터 모델로 구축하고, 구조화된 인메모리 마이닝 기법을 통해 **근본 원인(Root Cause Analysis, RCA)** 및 장애 전파 체인을 추적하는 데스크톱 GUI 진단 도구입니다.
+`WAS/Application Log Graph-Based RCA Analyzer`는 Spring Boot, Apache Tomcat, WildFly/JBoss 등 다양한 WAS 및 애플리케이션의 대용량 로그 파일(`*.log`, `*.out`)을 분석하여 장애 원인을 그래프 데이터 모델로 구축하고, 구조화된 인메모리 마이닝 기법을 통해 **근본 원인(Root Cause Analysis, RCA)**, 장애 전파 체인, 그리고 **Git 로컬 저장소 커밋/Diff 히스토리**까지 종합 추적하는 데스크톱 GUI 진단 도구입니다.
 
 임베디드 그래프 DB인 **Kùzu**와 **PyArrow Zero-Copy Streaming Ingestion** 기법을 결합하여 수 GB 이상의 대용량 로그도 **RAM 1GB 이내의 플랫한 메모리 점유율**로 초고속 인덱싱하며, 단순한 텍스트 매칭을 넘어 에러의 상위 호출 지점, 스레드 영향도, `Caused by` 인과 관계, StackTrace 체인을 유기적으로 시각화 및 분석합니다.
 
 ---
 
 ## ✨ 핵심 기능 (Key Features)
+
+- **Git Local Repository & Diff Viewer Integration (NEW)**: 로컬 Git 저장소 경로를 등록하면, 장애 파급 체인(`QTreeView`)의 메서드/클래스를 클릭했을 때 관련된 Git 커밋 이력(`GitHistoryDialog`)과 변경 내역 Diff(`GitDiffDialog`)을 GUI 팝업으로 즉시 조회하여 코드 변경점과의 연관성을 분석할 수 있습니다.
+
+- **Single Instance & Window Focus Activation (NEW)**: `QSharedMemory` 기반 중복 실행 방지 메커니즘을 적용하여 이미 프로그램이 구동 중인 경우 기존 창을 최상단으로 복원 및 포커싱(`SetForegroundWindow`)하며 중복 프로세스 실행을 차단합니다.
+
+- **Enterprise Domestic Encoding Fallback (NEW)**: 국내 엔터프라이즈 및 legacy 환경(Windows/Tomcat/WildFly)에서 발생하는 UTF-8 및 CP949/EUC-KR 인코딩 혼용 로그를 자동 감지하여 깨짐 없이 안정적으로 오픈합니다.
 
 - **Chunked Streaming & Low-Memory Ingestion**: 전체 로그를 한 번에 메모리에 올리지 않고 청크(Chunk, 5,000건 단위)별 분할 배치 스트리밍 처리를 수행합니다. 배치 완료 시 수동 Garbage Collection(`gc.collect()`)을 실행하여 수 GB 대용량 파일 분석 시에도 피크 RAM 점유를 1GB 이내로 안정적으로 제어합니다.
 
@@ -18,7 +24,7 @@
 
 - **PyArrow Zero-Copy & Kùzu Buffer Pool Optimization**: Apache Arrow 메모리 구조에서 C++ 엔진인 Kùzu DB 버퍼로 Zero-Copy 직렬화 주입을 수행하며, DB 오픈 시 명시적 버퍼 풀 메모리 할당(예: 4GB)을 적용해 Disk I/O 병목을 근본적으로 제거했습니다.
 
-- **Trace Propagation Chain & QTreeView Event Binding**: 최다 발생 근본 원인(Root Cause) 및 최근 발생 랭킹 표의 항목을 클릭하면, 선택한 메서드의 상세 Exception 발생 이력, `Caused By` 뿌리 원인, 상세 `Stack Trace` 샘플, 상위 호출자(`CALLS`) 체인을 트리 구조(`QTreeView`)로 즉시 계층 렌더링합니다.
+- **Trace Propagation Chain & QTreeView Event Binding**: 최다 발생 근본 원인(Root Cause) 및 최근 발생 랭킹 표의 항목을 클릭하면, 선택한 메서드의 상세 Exception 발생 이력, `Caused By` 뿌리 원인, 상세 `Stack Trace` 샘플, 상위 호출자(`CALLS`) 체인을 트리 구조(`QTreeView`)로 비동기 QThread 환경에서 정밀 계층 렌더링합니다.
 
 - **Multi-WAS & Application Log Auto-Detection**: Spring Boot(2.x/3.x), Apache Tomcat/Log4j2/Logback, WildFly/JBoss(server.log), WebLogic/Generic WAS 등 대표적인 로그 포맷을 정규표현식으로 자동 정밀 탐지하여 통합 분석합니다.
 
@@ -38,9 +44,9 @@
 
 - **In-Memory Data Framework**: Apache Arrow (`pyarrow`)
 
-- **GUI Framework**: [PyQt6](https://www.riverbankcomputing.com/software/pyqt/)
+- **GUI Framework**: PyQt6
 
-- **Pattern Matching**: Regular Expressions (Regex) & Dynamic Line Parsing
+- **Pattern Matching & VCS Integration**: Regular Expressions (Regex) & Git CLI Dynamic Subprocess Integration
 
 ---
 
@@ -87,31 +93,35 @@
 ### 1. 처리 알고리즘 흐름
 
 ````text
-[ 1. 파일 안전 해제 및 기존 Kùzu DB 안전 삭제/초기화 ]
+[ 1. Single Instance (QSharedMemory) 검증 & 스플래시 화면 노출 ]
                    ↓
-[ 2. 로그 패턴 자동 감지 (Spring Boot / Tomcat / WildFly / WebLogic) ]
+[ 2. 파일 안전 해제(open_log_file) 및 기존 Kùzu DB 안전 삭제/초기화 ]
                    ↓
-[ 3. 청크 단위 라인 스트리밍 파싱 (5,000 ERROR Context 단위) ]
+[ 3. 로그 패턴 자동 감지 (Spring Boot / Tomcat / WildFly / WebLogic) ]
                    ↓
-[ 4. 앱 레벨 글로벌 캐싱(Global Caching) 기반 중복 노드 필터링 ]
+[ 4. 청크 단위 라인 스트리밍 파싱 (5,000 ERROR Context 단위) ]
                    ↓
-[ 5. [Pass 1] Node 데이터 PyArrow Zero-Copy 직렬화 & Kùzu 'COPY FROM' 주입 ]
+[ 5. 앱 레벨 글로벌 캐싱(Global Caching) 기반 중복 노드 필터링 ]
                    ↓
-[ 6. [Pass 2] Relationship 데이터 PyArrow Zero-Copy & Kùzu 'COPY FROM' 주입 ]
+[ 6. [Pass 1] Node 데이터 PyArrow Zero-Copy 직렬화 & Kùzu 'COPY FROM' 주입 ]
                    ↓
-[ 7. 청크 메모리 초기화 및 명시적 GC(gc.collect()) 호출 ]
+[ 7. [Pass 2] Relationship 데이터 PyArrow Zero-Copy & Kùzu 'COPY FROM' 주입 ]
                    ↓
-[ 8. 인메모리 마이닝 기반 9대 영역 장애 사후 진단서 작성 (Post-Mortem Report) ]
+[ 8. 청크 메모리 초기화 및 명시적 GC(gc.collect()) 호출 ]
                    ↓
-[ 9. QTableWidget 랭킹 생성 & 셀 클릭 시 QTreeView 전파 체인 동적 로딩 ]
-```
+[ 9. 인메모리 마이닝 기반 9대 영역 장애 사후 진단서 작성 (Post-Mortem Report) ]
+                   ↓
+[10. QTableWidget 랭킹 생성 & 셀 클릭 시 QTreeView 전파 체인 동적 비동기 로딩 ]
+                   ↓
+[11. QTreeView 클릭 시 Git 히스토리(GitHistoryDialog) 및 Diff(GitDiffDialog) 팝업 ]
+```[cite: 1, 2]
 
 ### 2. 지원하는 로그 포맷 예시
 
-1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`
-2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`
-3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`
-4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`
+1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`[cite: 1, 2]
+2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`[cite: 1, 2]
+3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`[cite: 1, 2]
+4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`[cite: 1, 2]
 
 ---
 
@@ -119,18 +129,18 @@
 
 ### 1. 필수 패키지 설치
 
-프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다.
+프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다[cite: 2].
 
 ```bash
 pip install PyQt6 kuzu pyarrow
-```
+```[cite: 2]
 
 ### 2. 프로젝트 실행
 
-구동 환경이 준비되면 메인 스크립트를 실행합니다.
+구동 환경이 준비되면 메인 스크립트를 실행합니다[cite: 2].
 
 ```bash
-python main_5.py
+python main.py
 
 ````
 
@@ -139,16 +149,50 @@ python main_5.py
 PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함된 원클릭 패키징 명령어입니다.
 
 ````bash
-pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
-```
+uv run pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
+```[cite: 2]
 
 ---
 
 ## 💡 주요 코드 하이라이트
 
-### 1. PyArrow 기반 2-Pass 노드/관계 분리 벌크 주입 (`LogParseWorker`)
+### 1. Git 히스토리 및 Diff 조회 (`GitHistoryDialog` & `GitDiffDialog`)
 
-노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다.
+메서드/클래스명을 기반으로 Git 저장소 내에서 파일을 자동 탐색하고 `git log` 및 `git diff`를 연동하여 소스 변경 이력을 확인합니다[cite: 1].
+
+```python
+# Git log 명령어 실행을 통한 히스토리 추출
+cmd = [
+    "git", "log", "--follow", "-n", "30",
+    "--pretty=format:%h|%an|%ae|%ad|%s",
+    "--date=format:%Y-%m-%d %H:%M:%S",
+    "--", relative_file_path,
+]
+result = subprocess.run(cmd, cwd=self.git_path, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+
+# 이전 커밋 대비 Diff 추출
+cmd = ["git", "diff", f"{sha}~1", sha, "--", relative_file_path]
+diff_result = subprocess.run(cmd, cwd=self.git_path, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+```[cite: 1]
+
+### 2. CP949 / UTF-8 Fallback 인코딩 핸들러
+
+다양한 인코딩의 로그 파일 오픈 시 데코딩 오류 방지를 위해 자동 Fallback 처리를 적용합니다[cite: 1].
+
+```python
+def open_log_file(file_path: str):
+    try:
+        f = open(file_path, "r", encoding="utf-8")
+        f.readline()
+        f.seek(0)
+        return f
+    except (UnicodeDecodeError, Exception):
+        return open(file_path, "r", encoding="cp949", errors="ignore")
+```[cite: 1]
+
+### 3. PyArrow 기반 2-Pass 노드/관계 분리 벌크 주입 (`LogParseWorker`)
+
+노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다[cite: 1, 2].
 
 ```python
 # Pass 1: Exception 노드 벌크 주입
@@ -173,39 +217,12 @@ o_table = pa.Table.from_arrays(
     names=["from", "to"],
 )
 conn.execute("COPY OCCURRED_IN FROM o_table")
-```
-
-### 2. Kùzu DB 버퍼 풀 할당 및 메모리 관리
-
-대용량 I/O 병목을 없애기 위해 Kùzu 데이터베이스 세션 연결 시 메모리 버퍼 풀 크기를 제어합니다.
-
-```python
-# Kùzu 버퍼 풀 메모리 4GB 할당 예시
-KUZU_BUFFER_POOL_SIZE = 4 * 1024 * 1024 * 1024
-db = kuzu.Database(DB_PATH, buffer_pool_size=KUZU_BUFFER_POOL_SIZE)
-conn = kuzu.Connection(db)
-```
-
-### 3. 셀 클릭을 통한 에러 전파 체인(`QTreeView`) 실시간 복원
-
-테이블 클릭 시 선택된 메서드의 `Exception`, `Caused By`, `StackTrace`, `CALLS` 관계를 Cypher 쿼리로 동적 조회하여 트리에 시각화합니다
-
-```python
-# Caused By 원인 분석 체인 및 호출 경로 조회
-cb_query = """
-MATCH (ex:Exception {id: $ex_id})-[:CAUSED_BY]->(child:Exception)
-RETURN child.type, child.message
-"""
-res_cb = conn.execute(cb_query, {"ex_id": ex_id})
-while res_cb.has_next():
-    c_type, c_msg = res_cb.get_next()
-    ex_item.appendRow(QStandardItem(f"  └─ 💥 Caused by: {c_type}: {c_msg}"))
-```
+```[cite: 1, 2]
 
 ---
 
 ## 📄 라이선스 (License)
 
-이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다.
+이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다[cite: 2].
 
 ````

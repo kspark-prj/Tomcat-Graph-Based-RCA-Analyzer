@@ -1147,7 +1147,7 @@ class GitHistoryDialog(QDialog):
         self.method_name = method_name
 
         self.setWindowTitle(f"Git History - {class_full_name.split('.')[-1]}")
-        self.resize(850, 500)
+        self.resize(1050, 500)
         self.setup_ui()
         self.load_git_history()
 
@@ -1228,8 +1228,20 @@ class GitHistoryDialog(QDialog):
                 "커밋 메시지 (Commit Message)",
             ]
         )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+
+        # 컬럼 너비 정책 설정: 날짜(Date) 컬럼 간격을 넓히고 전체 텍스트가 안 잘리고 보이도록 지정
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+
+        self.table.setColumnWidth(0, 80)  # SHA
+        self.table.setColumnWidth(1, 120)  # 작성자
+        self.table.setColumnWidth(2, 180)  # 이메일
+        self.table.setColumnWidth(3, 160)  # 날짜 간격 넓힘 (2026-08-19 12:34:56 완전 표출)
+
         self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
 
         layout.addWidget(self.table)
