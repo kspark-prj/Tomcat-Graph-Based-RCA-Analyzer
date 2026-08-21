@@ -1,16 +1,16 @@
 import gc
+import html
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
-import html
 from datetime import datetime, timedelta
 
 import kuzu
 import pyarrow as pa
-import subprocess
-from PyQt6.QtCore import QModelIndex, QSharedMemory, QSize, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QModelIndex, QSharedMemory, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -35,7 +35,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 
 # Windows 전용 포커스 이동을 위한 ctypes 임포트
 if sys.platform == "win32":
@@ -139,7 +138,11 @@ def activate_existing_window(window_title_keyword: str):
 class CustomSplashScreen(QWidget):
     def __init__(self, image_path: str = "splash.png"):
         super().__init__()
-        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         target_width = 600
@@ -178,7 +181,9 @@ class CustomSplashScreen(QWidget):
 
         self.lbl_status = QLabel("시스템 초기화 진행 중...")
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_status.setStyleSheet("color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+        self.lbl_status.setStyleSheet(
+            "color: #a0a6b2; font-size: 11px; font-weight: 600; background: transparent; border: none;"
+        )
         bottom_layout.addWidget(self.lbl_status)
 
         self.progress_bar = QProgressBar()
@@ -262,7 +267,9 @@ def create_schema(conn: kuzu.Connection):
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS Exception(id STRING, type STRING, message STRING, stackTrace STRING, timestamp TIMESTAMP, PRIMARY KEY (id))"
     )
-    conn.execute("CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))")
+    conn.execute(
+        "CREATE NODE TABLE IF NOT EXISTS Method(fullName STRING, name STRING, isFramework BOOLEAN, PRIMARY KEY (fullName))"
+    )
     conn.execute("CREATE NODE TABLE IF NOT EXISTS Class(name STRING, PRIMARY KEY (name))")
 
     conn.execute("CREATE REL TABLE IF NOT EXISTS RAISED(FROM Thread TO Exception)")
@@ -440,17 +447,23 @@ class LogParseWorker(QThread):
 
                 new_threads = chunk_threads_set - global_threads_set
                 if new_threads:
-                    t_table = pa.Table.from_arrays([pa.array(list(new_threads), type=pa.string())], names=["name"])
+                    t_table = pa.Table.from_arrays(
+                        [pa.array(list(new_threads), type=pa.string())], names=["name"]
+                    )
                     conn.execute("COPY Thread FROM t_table")
                     global_threads_set.update(new_threads)
 
                 new_classes = chunk_classes_set - global_classes_set
                 if new_classes:
-                    c_table = pa.Table.from_arrays([pa.array(list(new_classes), type=pa.string())], names=["name"])
+                    c_table = pa.Table.from_arrays(
+                        [pa.array(list(new_classes), type=pa.string())], names=["name"]
+                    )
                     conn.execute("COPY Class FROM c_table")
                     global_classes_set.update(new_classes)
 
-                new_methods_dict = {k: v for k, v in chunk_methods_dict.items() if k not in global_methods_set}
+                new_methods_dict = {
+                    k: v for k, v in chunk_methods_dict.items() if k not in global_methods_set
+                }
                 if new_methods_dict:
                     m_full = [v[0] for v in new_methods_dict.values()]
                     m_name = [v[1] for v in new_methods_dict.values()]
@@ -628,7 +641,9 @@ class LogParseWorker(QThread):
 
                     match = detected_pattern["re"].match(line)
                     if match:
-                        clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern["parse"](match)
+                        clean_timestamp, thread_name, logger, raw_msg, log_level = detected_pattern[
+                            "parse"
+                        ](match)
 
                         if log_level in ["ERROR", "FATAL", "CRITICAL", "EMERGENCY"]:
                             if current_ctx:
@@ -693,7 +708,9 @@ class LogParseWorker(QThread):
                                     is_fw = class_name.startswith(FRAMEWORK_PACKAGES)
 
                                     if len(current_ctx["call_chain"]) < 30:
-                                        current_ctx["call_chain"].append((class_name, method_name, full_method, is_fw))
+                                        current_ctx["call_chain"].append(
+                                            (class_name, method_name, full_method, is_fw)
+                                        )
 
                             elif line.startswith("\t") or line.startswith("   "):
                                 if len(current_ctx["raw_stack_trace_lines"]) < 25:
@@ -753,8 +770,16 @@ class DiagnosisWorker(QThread):
 
             chart_10step_data = []
             try:
-                dt_start = datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(start_t, str) else start_t
-                dt_end = datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S") if isinstance(end_t, str) else end_t
+                dt_start = (
+                    datetime.strptime(str(start_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
+                    if isinstance(start_t, str)
+                    else start_t
+                )
+                dt_end = (
+                    datetime.strptime(str(end_t).split(".")[0], "%Y-%m-%d %H:%M:%S")
+                    if isinstance(end_t, str)
+                    else end_t
+                )
                 total_duration = (dt_end - dt_start).total_seconds()
 
                 if total_duration <= 0:
@@ -829,7 +854,10 @@ class DiagnosisWorker(QThread):
                     ]
                 ):
                     oom_cnt += cnt
-                elif any(k in str_type or k in str_msg for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]):
+                elif any(
+                    k in str_type or k in str_msg
+                    for k in ["SQL", "Timeout", "Hikari", "Connection", "Deadlock", "Constraint"]
+                ):
                     db_cnt += cnt
                 elif any(
                     k in str_type or k in str_msg
@@ -913,10 +941,14 @@ class DiagnosisWorker(QThread):
             cfg_pct = int((cfg_cnt / total_cnt) * 100) if total_cnt > 0 else 0
             parse_pct = int((parse_cnt / total_cnt) * 100) if total_cnt > 0 else 0
 
-            used_sum = oom_pct + db_pct + thread_pct + net_pct + mq_pct + auth_pct + cfg_pct + parse_pct
+            used_sum = (
+                oom_pct + db_pct + thread_pct + net_pct + mq_pct + auth_pct + cfg_pct + parse_pct
+            )
             app_pct = max(0, 100 - used_sum)
 
-            max_pct = max(oom_pct, db_pct, thread_pct, net_pct, mq_pct, auth_pct, cfg_pct, parse_pct, app_pct)
+            max_pct = max(
+                oom_pct, db_pct, thread_pct, net_pct, mq_pct, auth_pct, cfg_pct, parse_pct, app_pct
+            )
             diagnosis_tag, recommendation = "", ""
 
             if max_pct == oom_pct and oom_pct > 0:
@@ -926,7 +958,9 @@ class DiagnosisWorker(QThread):
                 diagnosis_tag = "🔴 DATABASE BOTTLE_NECK (데이터베이스 장애)"
                 recommendation = "   1. [커넥션 풀 고갈]: HikariCP/DataSource 커넥션 점유 점검.\n   2. [슬로우 쿼리]: 대형 조인 및 인덱스 누락 점검."
             elif max_pct == thread_pct and thread_pct > 0:
-                diagnosis_tag = "⚡ THREAD POOL & CONCURRENCY BOTTLE_NECK (스레드 풀 고갈 및 동시성 병목)"
+                diagnosis_tag = (
+                    "⚡ THREAD POOL & CONCURRENCY BOTTLE_NECK (스레드 풀 고갈 및 동시성 병목)"
+                )
                 recommendation = "   1. [Async Thread Pool]: @Async 및 TaskExecutor의 corePoolSize / queueCapacity 재설정.\n   2. [Backpressure]: 순간 유입 트래픽 제어를 위한 Rate Limiter 도입 검토."
             elif max_pct == net_pct and net_pct > 0:
                 diagnosis_tag = "⚡ EXTERNAL NETWORK OUTAGE (외부 연동망 및 SFTP/네트워크 장애)"
@@ -979,9 +1013,7 @@ class DiagnosisWorker(QThread):
                 root_data.append((f"{cnt:,}", str(method_name or ""), str(ex_type or "")))
 
             recent_data = []
-            recent_query = (
-                "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
-            )
+            recent_query = "MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method) RETURN ex.timestamp, m.fullName, ex.type ORDER BY ex.timestamp DESC LIMIT 10"
             res_recent = conn.execute(recent_query)
             while res_recent.has_next():
                 ts, method_name, ex_type = res_recent.get_next()
@@ -1009,11 +1041,11 @@ class GitDiffDialog(QDialog):
         self.sha = sha
         self.file_path = file_path
         self.diff_text = diff_text
-        
+
         self.setWindowTitle(f"Git Diff - {os.path.basename(file_path)} ({sha})")
         self.resize(900, 600)
         self.setup_ui()
-        
+
     def setup_ui(self):
         self.setStyleSheet(
             """
@@ -1032,16 +1064,16 @@ class GitDiffDialog(QDialog):
             }
             """
         )
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
-        
+
         # 정보 라벨
         lbl_info = QLabel(f"<b>📄 파일:</b> {self.file_path} (Commit: {self.sha})")
         lbl_info.setStyleSheet("color: #9cdcfe; font-size: 12px;")
         layout.addWidget(lbl_info)
-        
+
         # Diff 표시용 QTextBrowser
         self.text_browser = QTextBrowser()
         self.text_browser.setStyleSheet(
@@ -1055,33 +1087,46 @@ class GitDiffDialog(QDialog):
             }
             """
         )
-        
+
         # HTML 렌더링을 통한 + - 색상 구분
         html_lines = []
         lines = self.diff_text.splitlines()
         for line in lines:
             escaped_line = html.escape(line)
             # + 와 - 의 색상을 다르게 스타일링
-            if line.startswith('+') and not line.startswith('+++'):
-                html_lines.append(f'<div style="color: #4ec9b0; background-color: #1e3d2f; font-weight: bold;">{escaped_line}</div>')
-            elif line.startswith('-') and not line.startswith('---'):
-                html_lines.append(f'<div style="color: #f44747; background-color: #3d1e1e; font-weight: bold;">{escaped_line}</div>')
-            elif line.startswith('@@'):
-                html_lines.append(f'<div style="color: #569cd6; background-color: #2d2d30;">{escaped_line}</div>')
-            elif line.startswith('diff --git') or line.startswith('index ') or line.startswith('--- ') or line.startswith('+++ '):
-                html_lines.append(f'<div style="color: #858585; font-weight: bold;">{escaped_line}</div>')
+            if line.startswith("+") and not line.startswith("+++"):
+                html_lines.append(
+                    f'<div style="color: #4ec9b0; background-color: #1e3d2f; font-weight: bold;">{escaped_line}</div>'
+                )
+            elif line.startswith("-") and not line.startswith("---"):
+                html_lines.append(
+                    f'<div style="color: #f44747; background-color: #3d1e1e; font-weight: bold;">{escaped_line}</div>'
+                )
+            elif line.startswith("@@"):
+                html_lines.append(
+                    f'<div style="color: #569cd6; background-color: #2d2d30;">{escaped_line}</div>'
+                )
+            elif (
+                line.startswith("diff --git")
+                or line.startswith("index ")
+                or line.startswith("--- ")
+                or line.startswith("+++ ")
+            ):
+                html_lines.append(
+                    f'<div style="color: #858585; font-weight: bold;">{escaped_line}</div>'
+                )
             else:
                 html_lines.append(f'<div style="color: #d4d4d4;">{escaped_line}</div>')
-                
+
         html_content = (
             f"<div style='font-family: Consolas, \"Courier New\", monospace; white-space: pre; line-height: 120%;'>"
             f"{''.join(html_lines)}"
             f"</div>"
         )
         self.text_browser.setHtml(html_content)
-        
+
         layout.addWidget(self.text_browser)
-        
+
         # 하단 닫기 버튼
         btn_box = QHBoxLayout()
         btn_box.addStretch()
@@ -1100,12 +1145,12 @@ class GitHistoryDialog(QDialog):
         self.git_path = git_path
         self.class_full_name = class_full_name
         self.method_name = method_name
-        
+
         self.setWindowTitle(f"Git History - {class_full_name.split('.')[-1]}")
         self.resize(850, 500)
         self.setup_ui()
         self.load_git_history()
- 
+
     def setup_ui(self):
         self.setStyleSheet(
             """
@@ -1139,48 +1184,56 @@ class GitHistoryDialog(QDialog):
             }
             """
         )
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
-        
+
         # 상단 정보 레이블
         info_layout = QGridLayout()
         info_layout.setSpacing(6)
-        
+
         lbl_class_title = QLabel("<b>클래스 풀네임:</b>")
         self.lbl_class_val = QLabel(self.class_full_name)
         self.lbl_class_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        
+
         lbl_method_title = QLabel("<b>메소드명:</b>")
         self.lbl_method_val = QLabel(self.method_name)
         self.lbl_method_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        
+
         lbl_file_title = QLabel("<b>로컬 파일 경로:</b>")
         self.lbl_file_val = QLabel("검색 중...")
         self.lbl_file_val.setStyleSheet("color: #00d2d3;")
         self.lbl_file_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        
+
         info_layout.addWidget(lbl_class_title, 0, 0)
         info_layout.addWidget(self.lbl_class_val, 0, 1)
         info_layout.addWidget(lbl_method_title, 1, 0)
         info_layout.addWidget(self.lbl_method_val, 1, 1)
         info_layout.addWidget(lbl_file_title, 2, 0)
         info_layout.addWidget(self.lbl_file_val, 2, 1)
-        
+
         layout.addLayout(info_layout)
-        
+
         # Git 기록 테이블
         self.table = QTableWidget(0, 5)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setHorizontalHeaderLabels(["SHA", "작성자 (Author)", "이메일 (Email)", "날짜 (Date)", "커밋 메시지 (Commit Message)"])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "SHA",
+                "작성자 (Author)",
+                "이메일 (Email)",
+                "날짜 (Date)",
+                "커밋 메시지 (Commit Message)",
+            ]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
-        
+
         layout.addWidget(self.table)
-        
+
         # 하단 닫기 버튼
         btn_box = QHBoxLayout()
         btn_box.addStretch()
@@ -1195,22 +1248,24 @@ class GitHistoryDialog(QDialog):
             self.lbl_file_val.setText("로컬 Git 저장소 내에서 해당 소스 파일을 찾을 수 없습니다.")
             self.lbl_file_val.setStyleSheet("color: #ff6e40;")
             return
-            
+
         full_file_path = os.path.join(self.git_path, relative_file_path).replace("\\", "/")
         self.lbl_file_val.setText(full_file_path)
         self.lbl_file_val.setStyleSheet("color: #27ae60;")
-        
+
         try:
             cmd = [
-                "git", "log",
+                "git",
+                "log",
                 "--follow",
-                "-n", "30",
+                "-n",
+                "30",
                 "--pretty=format:%h|%an|%ae|%ad|%s",
                 "--date=format:%Y-%m-%d %H:%M:%S",
                 "--",
-                relative_file_path
+                relative_file_path,
             ]
-            
+
             result = subprocess.run(
                 cmd,
                 cwd=self.git_path,
@@ -1219,14 +1274,14 @@ class GitHistoryDialog(QDialog):
                 text=True,
                 encoding="utf-8",
                 errors="ignore",
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
-            
+
             if result.returncode != 0:
                 self.lbl_file_val.setText(f"Git 로그 조회 실패: {result.stderr.strip()}")
                 self.lbl_file_val.setStyleSheet("color: #ff6e40;")
                 return
-                
+
             lines = result.stdout.splitlines()
             self.table.setSortingEnabled(False)
             self.table.setRowCount(0)
@@ -1234,9 +1289,9 @@ class GitHistoryDialog(QDialog):
                 parts = line.split("|", 4)
                 if len(parts) < 5:
                     parts = parts + [""] * (5 - len(parts))
-                
+
                 sha, author, email, date, msg = parts
-                
+
                 self.table.insertRow(row_idx)
                 self.table.setItem(row_idx, 0, QTableWidgetItem(sha))
                 self.table.setItem(row_idx, 1, QTableWidgetItem(author))
@@ -1245,7 +1300,7 @@ class GitHistoryDialog(QDialog):
                 self.table.setItem(row_idx, 4, QTableWidgetItem(msg))
             self.table.setSortingEnabled(True)
             self.table.sortByColumn(3, Qt.SortOrder.DescendingOrder)
-                
+
         except Exception as e:
             self.lbl_file_val.setText(f"Git 실행 오류: {e}")
             self.lbl_file_val.setStyleSheet("color: #ff6e40;")
@@ -1253,7 +1308,7 @@ class GitHistoryDialog(QDialog):
     def find_file_in_git(self, git_path: str, class_full_name: str) -> str | None:
         path_suffix = class_full_name.replace(".", "/")
         class_simple_name = class_full_name.split(".")[-1]
-        
+
         try:
             result = subprocess.run(
                 ["git", "ls-files"],
@@ -1263,28 +1318,28 @@ class GitHistoryDialog(QDialog):
                 text=True,
                 encoding="utf-8",
                 errors="ignore",
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
             if result.returncode != 0:
                 return None
-                
+
             files = result.stdout.splitlines()
-            
+
             # 1차 매칭: 패키지 경로 일치
             for f in files:
                 f_no_ext, _ = os.path.splitext(f)
                 if f_no_ext.replace("\\", "/").endswith(path_suffix):
                     return f
-                    
+
             # 2차 매칭: 단순 클래스명 매칭
             for f in files:
                 f_no_ext, _ = os.path.splitext(f)
                 if os.path.basename(f_no_ext) == class_simple_name:
                     return f
-                    
+
         except Exception as e:
             print(f"Git 파일 검색 오류: {e}")
-            
+
         return None
 
     def on_cell_double_clicked(self, row, col):
@@ -1292,12 +1347,14 @@ class GitHistoryDialog(QDialog):
         if not sha_item:
             return
         sha = sha_item.text().strip()
-        
+
         relative_file_path = self.find_file_in_git(self.git_path, self.class_full_name)
         if not relative_file_path:
-            QMessageBox.warning(self, "오류", "로컬 Git 저장소 내에서 해당 소스 파일을 찾을 수 없습니다.")
+            QMessageBox.warning(
+                self, "오류", "로컬 Git 저장소 내에서 해당 소스 파일을 찾을 수 없습니다."
+            )
             return
-            
+
         try:
             # 이전 커밋(sha~1)과 현재 커밋(sha)의 비교 시도
             cmd = ["git", "diff", f"{sha}~1", sha, "--", relative_file_path]
@@ -1309,9 +1366,9 @@ class GitHistoryDialog(QDialog):
                 text=True,
                 encoding="utf-8",
                 errors="ignore",
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
-            
+
             # 만약 첫 번째 커밋이라 sha~1이 없다면 전체 내용을 diff 형식으로 보여주기 위해 git show를 실행
             if result.returncode != 0:
                 cmd = ["git", "show", sha, "--", relative_file_path]
@@ -1323,20 +1380,22 @@ class GitHistoryDialog(QDialog):
                     text=True,
                     encoding="utf-8",
                     errors="ignore",
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                 )
-                
+
             if result.returncode != 0:
-                QMessageBox.warning(self, "오류", f"diff를 가져오지 못했습니다:\n{result.stderr.strip()}")
+                QMessageBox.warning(
+                    self, "오류", f"diff를 가져오지 못했습니다:\n{result.stderr.strip()}"
+                )
                 return
-                
+
             diff_output = result.stdout
             if not diff_output.strip():
                 diff_output = "변경 사항이 없습니다."
-                
+
             dialog = GitDiffDialog(sha, relative_file_path, diff_output, self)
             dialog.exec()
-            
+
         except Exception as e:
             QMessageBox.critical(self, "오류", f"Git 명령 실행 오류: {e}")
 
@@ -1391,7 +1450,9 @@ class TreeLoadWorker(QThread):
                 root_node.appendRow(ex_item)
 
             if not has_data:
-                root_node.appendRow(QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다."))
+                root_node.appendRow(
+                    QStandardItem("  ℹ️ 연결된 상세 스택트레이스 데이터가 없습니다.")
+                )
 
             calls_query = """
             MATCH (caller:Method)-[:CALLS]->(m:Method {fullName: $method_name})
@@ -1489,7 +1550,9 @@ class MainWindow(QMainWindow):
             self.init_database_safely()
             self.reset_ui_components()
 
-            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
+            self.btn_upload.setText(
+                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
+            )
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [대기 중]")
             self.lbl_status.setText("데이터베이스가 성공적으로 수동 초기화되었습니다.")
             self.progress_bar.setValue(0)
@@ -1502,7 +1565,9 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(6)
 
         top_bar = QHBoxLayout()
-        self.btn_upload = QPushButton("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
+        self.btn_upload = QPushButton(
+            "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
+        )
         self.btn_upload.clicked.connect(self.upload_log)
         self.btn_upload.setStyleSheet(
             "background-color: #1e3d59; color: white; font-weight: bold; padding: 12px; font-size: 13px; border-radius: 4px;"
@@ -1521,31 +1586,35 @@ class MainWindow(QMainWindow):
         # Git 로컬 경로 입력 창 추가
         git_bar = QHBoxLayout()
         git_bar.setSpacing(6)
-        
+
         lbl_git_path = QLabel("<b>📁 Git 로컬 경로:</b>")
         lbl_git_path.setStyleSheet("font-size: 12px; color: #dcdde1;")
-        
+
         self.txt_git_path = QLineEdit()
-        self.txt_git_path.setPlaceholderText("예: C:/Users/name/workspace/tomcat (로컬 Git 저장소 경로 등록 시 상세 분석 체인 클릭하여 Git 히스토리 조회 가능)")
+        self.txt_git_path.setPlaceholderText(
+            "예: C:/Users/name/workspace/tomcat (로컬 Git 저장소 경로 등록 시 상세 분석 체인 클릭하여 Git 히스토리 조회 가능)"
+        )
         self.txt_git_path.setStyleSheet(
             "background-color: #2f3640; color: #f5f6fa; border: 1px solid #1e222b; padding: 6px; border-radius: 4px; font-size: 12px;"
         )
-        
+
         btn_git_browse = QPushButton("📁 경로 선택")
         btn_git_browse.clicked.connect(self.browse_git_path)
         btn_git_browse.setStyleSheet(
             "background-color: #34495e; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 12px;"
         )
-        
+
         git_bar.addWidget(lbl_git_path)
         git_bar.addWidget(self.txt_git_path, 1)
         git_bar.addWidget(btn_git_browse)
-        
+
         main_layout.addLayout(git_bar)
 
         status_box = QHBoxLayout()
         self.lbl_detected_pattern = QLabel("🔍 감지된 로그 포맷: [대기 중]")
-        self.lbl_detected_pattern.setStyleSheet("color: #27ae60; font-weight: bold; font-size: 12px;")
+        self.lbl_detected_pattern.setStyleSheet(
+            "color: #27ae60; font-weight: bold; font-size: 12px;"
+        )
 
         self.lbl_status = QLabel("로그 파일을 선택하면 기존 DB를 자동 비우고 분석을 시작합니다.")
         self.lbl_status.setStyleSheet("color: #7f8c8d; font-style: italic;")
@@ -1563,7 +1632,9 @@ class MainWindow(QMainWindow):
         top_report_box.setSpacing(2)
         top_report_box.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel("<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>")
+        title_lbl = QLabel(
+            "<b>📝 인메모리 마이닝 기반 장애 정밀 요약 보고서 (Post-Mortem Report)</b>"
+        )
         title_lbl.setStyleSheet("margin: 0px; padding: 0px;")
         top_report_box.addWidget(title_lbl)
 
@@ -1579,16 +1650,20 @@ class MainWindow(QMainWindow):
         chart_group = QVBoxLayout()
         chart_group.setSpacing(2)
 
-        chart_title = QLabel("<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>")
+        chart_title = QLabel(
+            "<b>📊 10단계 시간대별 예외 발생 분포 (Timeline Distribution - 역순 정렬)</b>"
+        )
         chart_group.addWidget(chart_title)
 
         chart_frame = QFrame()
-        chart_frame.setStyleSheet("background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;")
+        chart_frame.setStyleSheet(
+            "background-color: #23272e; border: 1px solid #1e222b; border-radius: 4px;"
+        )
         chart_grid = QGridLayout(chart_frame)
 
-        chart_grid.setContentsMargins(4, 4, 4, 4)
-        chart_grid.setHorizontalSpacing(4)
-        chart_grid.setVerticalSpacing(2)
+        chart_grid.setContentsMargins(6, 6, 6, 6)
+        chart_grid.setHorizontalSpacing(8)
+        chart_grid.setVerticalSpacing(4)
 
         self.chart_bars = []
         self.chart_time_lbls = []
@@ -1599,15 +1674,17 @@ class MainWindow(QMainWindow):
 
             cell_box = QHBoxLayout()
             cell_box.setContentsMargins(0, 0, 0, 0)
-            cell_box.setSpacing(2)
+            cell_box.setSpacing(4)
 
             time_lbl = QLabel(f"T{10 - i}: --:--~--:--")
             time_lbl.setStyleSheet("color: #00d2d3; font-weight: bold; font-size: 10px;")
-            time_lbl.setFixedWidth(92)
+            time_lbl.setFixedWidth(85)
 
             p_bar = QProgressBar()
             p_bar.setFixedHeight(10)
-            p_bar.setMinimumWidth(20)
+            # 차트 폭 제한 (너비 줄임)
+            p_bar.setMinimumWidth(30)
+            p_bar.setMaximumWidth(80)
             p_bar.setTextVisible(False)
             p_bar.setStyleSheet(
                 """
@@ -1618,12 +1695,13 @@ class MainWindow(QMainWindow):
 
             val_lbl = QLabel("0건 (0%)")
             val_lbl.setStyleSheet("color: #dcdde1; font-size: 10px;")
-            val_lbl.setFixedWidth(52)
-            val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            val_lbl.setFixedWidth(75)
+            val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
             cell_box.addWidget(time_lbl)
-            cell_box.addWidget(p_bar, 1)
+            cell_box.addWidget(p_bar)
             cell_box.addWidget(val_lbl)
+            cell_box.addStretch()
 
             chart_grid.addLayout(cell_box, row, col)
 
@@ -1636,11 +1714,15 @@ class MainWindow(QMainWindow):
         bottom_layout = QHBoxLayout()
 
         bottom_left_box = QVBoxLayout()
-        bottom_left_box.addWidget(QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>"))
+        bottom_left_box.addWidget(
+            QLabel("<b>🔥 근본 원인(Root Cause) 에러 코드 랭킹 (누적 다빈도)</b>")
+        )
         self.table_root = QTableWidget(0, 3)
         self.table_root.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_root.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_root.setHorizontalHeaderLabels(["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"])
+        self.table_root.setHorizontalHeaderLabels(
+            ["발생건수", "근본 원인 메서드 (Root Method)", "주요 예외 클래스"]
+        )
         self.table_root.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_root, 1)
 
@@ -1648,14 +1730,18 @@ class MainWindow(QMainWindow):
         self.table_recent = QTableWidget(0, 3)
         self.table_recent.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_recent.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_recent.setHorizontalHeaderLabels(["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"])
+        self.table_recent.setHorizontalHeaderLabels(
+            ["최근 발생 시각", "발생 메서드 (Recent Method)", "예외 클래스"]
+        )
         self.table_recent.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         bottom_left_box.addWidget(self.table_recent, 1)
 
         bottom_layout.addLayout(bottom_left_box, 1)
 
         bottom_right_box = QVBoxLayout()
-        bottom_right_box.addWidget(QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>"))
+        bottom_right_box.addWidget(
+            QLabel("<b>장애 파급 효과 및 전파 체인 (상세 스택트레이스 포함)</b>")
+        )
         self.tree_view = QTreeView()
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
@@ -1689,19 +1775,19 @@ class MainWindow(QMainWindow):
         git_path = self.txt_git_path.text().strip()
         if not git_path:
             return
-            
+
         item = self.tree_model.itemFromIndex(index)
         if not item:
             return
-            
+
         text = item.text()
         method_name = None
-        
+
         if text.startswith("🎯 Target Method:"):
             method_name = text.replace("🎯 Target Method:", "").strip()
         elif "⬆️ Called By:" in text:
             method_name = text.split("⬆️ Called By:")[-1].strip()
-            
+
         if method_name:
             self.show_git_history_popup(git_path, method_name)
 
@@ -1713,7 +1799,7 @@ class MainWindow(QMainWindow):
         else:
             class_full_name = method_name
             method_only = ""
-            
+
         dialog = GitHistoryDialog(git_path, class_full_name, method_only, self)
         dialog.exec()
 
@@ -1722,7 +1808,9 @@ class MainWindow(QMainWindow):
         self.tree_model.clear()
         self.tree_model.setHorizontalHeaderLabels(["에러 전파 타임라인 및 상세 분석 체인"])
 
-        loading_node = QStandardItem(f"⏳ Target Method ({method_name}) 상세 전파 체인 불러오는 중...")
+        loading_node = QStandardItem(
+            f"⏳ Target Method ({method_name}) 상세 전파 체인 불러오는 중..."
+        )
         self.tree_model.appendRow(loading_node)
 
         self.close_db_connection()
@@ -1738,7 +1826,9 @@ class MainWindow(QMainWindow):
         self.tree_view.expandAll()
 
     def upload_log(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Log File Selection", "", "Log Files (*.log *.out);;All Files (*)"
+        )
         if file_path:
             self.btn_upload.setEnabled(False)
             self.btn_upload.setText("⏳ 이전 DB 초기화 및 대용량 스트리밍 분석 진행 중...")
@@ -1765,7 +1855,9 @@ class MainWindow(QMainWindow):
         if not is_success or parsed_count == 0:
             self.init_database_safely()
             self.btn_upload.setEnabled(True)
-            self.btn_upload.setText("📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)")
+            self.btn_upload.setText(
+                "📁 통합 로그 파일 선택 및 자동 분석 시작 (Spring / Tomcat / WildFly)"
+            )
             self.lbl_detected_pattern.setText("🔍 감지된 로그 포맷: [인식 실패]")
             self.lbl_status.setText("⚠️ 분석 중단: 일치하는 패턴이 없거나 에러 로그가 없습니다.")
             self.progress_bar.setValue(0)
@@ -1782,11 +1874,15 @@ class MainWindow(QMainWindow):
 
         self.diag_worker = DiagnosisWorker(DB_PATH)
         self.diag_worker.finished.connect(
-            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(report, r_data, rec_data, c_data, parsed_count)
+            lambda report, r_data, rec_data, c_data: self.on_diagnosis_finished(
+                report, r_data, rec_data, c_data, parsed_count
+            )
         )
         self.diag_worker.start()
 
-    def on_diagnosis_finished(self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int):
+    def on_diagnosis_finished(
+        self, report: str, root_data: list, recent_data: list, chart_data: list, parsed_count: int
+    ):
         self.init_database_safely()
 
         self.btn_upload.setEnabled(True)
