@@ -90,59 +90,25 @@
 
 로그 파일의 텍스트 스트림이 메모리 상에서 정제된 뒤 PyArrow를 거쳐 Kùzu DB 노드와 관계(Edge)로 고속 변환되는 고성능 파이프라인 프로세스입니다.
 
-### 1. 처리 알고리즘 흐름
+### 1. 지원하는 로그 포맷 예시
 
-````text
-[ 1. Single Instance (QSharedMemory) 검증 & 스플래시 화면 노출 ]
-                   ↓
-[ 2. 파일 안전 해제(open_log_file) 및 기존 Kùzu DB 안전 삭제/초기화 ]
-                   ↓
-[ 3. 로그 패턴 자동 감지 (Spring Boot / Tomcat / WildFly / WebLogic) ]
-                   ↓
-[ 4. 청크 단위 라인 스트리밍 파싱 (5,000 ERROR Context 단위) ]
-                   ↓
-[ 5. 앱 레벨 글로벌 캐싱(Global Caching) 기반 중복 노드 필터링 ]
-                   ↓
-[ 6. [Pass 1] Node 데이터 PyArrow Zero-Copy 직렬화 & Kùzu 'COPY FROM' 주입 ]
-                   ↓
-[ 7. [Pass 2] Relationship 데이터 PyArrow Zero-Copy & Kùzu 'COPY FROM' 주입 ]
-                   ↓
-[ 8. 청크 메모리 초기화 및 명시적 GC(gc.collect()) 호출 ]
-                   ↓
-[ 9. 인메모리 마이닝 기반 9대 영역 장애 사후 진단서 작성 (Post-Mortem Report) ]
-                   ↓
-[10. QTableWidget 랭킹 생성 & 셀 클릭 시 QTreeView 전파 체인 동적 비동기 로딩 ]
-                   ↓
-[11. QTreeView 클릭 시 Git 히스토리(GitHistoryDialog) 및 Diff(GitDiffDialog) 팝업 ]
-```[cite: 1, 2]
-
-### 2. 지원하는 로그 포맷 예시
-
-1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`[cite: 1, 2]
-2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`[cite: 1, 2]
-3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`[cite: 1, 2]
-4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`[cite: 1, 2]
+1. **Spring Boot 포맷**: `2026-07-23T14:30:15.123+09:00 ERROR 12345 --- [http-nio-8080-exec-5] com.example.Controller : Error msg`
+2. **Tomcat / Standard Log4j 포맷**: `2026-07-23 14:30:15.123 [http-nio-8080-exec-5] ERROR com.example.Controller - Error msg`
+3. **WildFly / JBoss server.log 포맷**: `2026-07-23 14:30:15,123 ERROR [com.example.Controller] (default task-1) Error msg`
+4. **WebLogic / Generic WAS 포맷**: `<2026-07-23T14:30:15.123> <ERROR> <AdminServer> <http-nio-8080-exec-5> Error msg`
 
 ---
 
 ## 🚀 시작하기 (Getting Started)
 
-### 1. 필수 패키지 설치
+### 1. 프로젝트 실행
 
-프로젝트 실행을 위해 아래 라이브러리들을 설치해야 합니다[cite: 2].
-
-```bash
-pip install PyQt6 kuzu pyarrow
-```[cite: 2]
-
-### 2. 프로젝트 실행
-
-구동 환경이 준비되면 메인 스크립트를 실행합니다[cite: 2].
+구동 환경이 준비되면 메인 스크립트를 실행합니다.
 
 ```bash
-python main.py
+uv run main.py
 
-````
+```
 
 ### 3. PyInstaller 단일 실행 파일 패키징 (바이너리 빌드)
 
@@ -150,79 +116,129 @@ PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함�
 
 ````bash
 uv run pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
-```[cite: 2]
-
----
-
-## 💡 주요 코드 하이라이트
-
-### 1. Git 히스토리 및 Diff 조회 (`GitHistoryDialog` & `GitDiffDialog`)
-
-메서드/클래스명을 기반으로 Git 저장소 내에서 파일을 자동 탐색하고 `git log` 및 `git diff`를 연동하여 소스 변경 이력을 확인합니다[cite: 1].
-
-```python
-# Git log 명령어 실행을 통한 히스토리 추출
-cmd = [
-    "git", "log", "--follow", "-n", "30",
-    "--pretty=format:%h|%an|%ae|%ad|%s",
-    "--date=format:%Y-%m-%d %H:%M:%S",
-    "--", relative_file_path,
-]
-result = subprocess.run(cmd, cwd=self.git_path, stdout=subprocess.PIPE, text=True, encoding="utf-8")
-
-# 이전 커밋 대비 Diff 추출
-cmd = ["git", "diff", f"{sha}~1", sha, "--", relative_file_path]
-diff_result = subprocess.run(cmd, cwd=self.git_path, stdout=subprocess.PIPE, text=True, encoding="utf-8")
-```[cite: 1]
-
-### 2. CP949 / UTF-8 Fallback 인코딩 핸들러
-
-다양한 인코딩의 로그 파일 오픈 시 데코딩 오류 방지를 위해 자동 Fallback 처리를 적용합니다[cite: 1].
-
-```python
-def open_log_file(file_path: str):
-    try:
-        f = open(file_path, "r", encoding="utf-8")
-        f.readline()
-        f.seek(0)
-        return f
-    except (UnicodeDecodeError, Exception):
-        return open(file_path, "r", encoding="cp949", errors="ignore")
-```[cite: 1]
-
-### 3. PyArrow 기반 2-Pass 노드/관계 분리 벌크 주입 (`LogParseWorker`)
-
-노드를 먼저 주입하여 Graph DB 엔진 내부의 Primary Key 인덱스 공간을 확정한 뒤, 관계(Edge)를 일괄 주입하는 2-Pass 아키텍처입니다[cite: 1, 2].
-
-```python
-# Pass 1: Exception 노드 벌크 주입
-e_table = pa.Table.from_arrays(
-    [
-        pa.array(e_ids, type=pa.string()),
-        pa.array(e_types, type=pa.string()),
-        pa.array(e_msgs, type=pa.string()),
-        pa.array(e_sts, type=pa.string()),
-        pa.array(e_tss, type=pa.timestamp("us")),
-    ],
-    names=["id", "type", "message", "stackTrace", "timestamp"],
-)
-conn.execute("COPY Exception FROM e_table")
-
-# Pass 2: OCCURRED_IN 관계(Edge) 벌크 주입
-o_table = pa.Table.from_arrays(
-    [
-        pa.array([v[0] for v in chunk_occurred_in_set], type=pa.string()),
-        pa.array([v[1] for v in chunk_occurred_in_set], type=pa.string()),
-    ],
-    names=["from", "to"],
-)
-conn.execute("COPY OCCURRED_IN FROM o_table")
-```[cite: 1, 2]
-
----
-
-## 📄 라이선스 (License)
-
-이 프로젝트는 MIT 라이선스 하에 자유롭게 수정 및 배포가 가능합니다[cite: 2].
-
+```
 ````
+
+### kuzu explorer docker 웹 대시보드
+
+docker run -p 8000:8000 \
+ -v "/path/to/your/project:/database" \
+ -e KUZU_FILE=kuzu_unified_log_db \
+ -e MODE=READ_ONLY \
+ --rm kuzudb/explorer:0.11.3
+
+### 1. Kùzu Explorer 그래프 시각화 쿼리 (가장 추천)
+
+Explorer의 강점인 노드와 관계선 시각화 그래프를 바로 확인할 수 있는 쿼리입니다.
+
+#### ① 스레드 ➔ 예외 ➔ 발생 메서드 전체 체인 시각화
+
+    MATCH (t:Thread)-[r1:RAISED]->(ex:Exception)-[r2:OCCURRED_IN]->(m:Method)
+    RETURN *
+    LIMIT 50;
+
+#### ② 예외 전파 체인 (Caused By) 시각화
+
+상위 예외와 이를 유발한 하위 근본 예외 간의 인과관계를 그래프로 확인합니다.
+MATCH (parent:Exception)-[r:CAUSED_BY]->(child:Exception)
+RETURN \*
+LIMIT 30;
+
+#### ③ 메서드 간 호출 관계 (CALLS) 시각화
+
+에러 발생 지점을 호출한 메서드들의 호출 흐름을 확인합니다.
+
+    MATCH (caller:Method)-[r:CALLS]->(callee:Method)
+    RETURN *
+    LIMIT 30;
+
+──────
+
+### 2. 근본 원인 분석 (RCA) 통계 쿼리 (Table View 추천)
+
+#### ① 에러 발생 빈도 1위 메서드 Top 10 (장애 유발 핵심 메서드)
+
+어떤 메서드에서 가장 많은 에러가 터졌는지 집계합니다.
+
+    MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method)
+    RETURN m.fullName AS MethodName, ex.type AS ExceptionType, count(ex) AS ErrorCount
+    ORDER BY ErrorCount DESC
+    LIMIT 10;
+
+#### ② 프레임워크가 아닌 "사용자 애플리케이션 코드" 에러만 필터링
+
+Spring, Tomcat, JDK 내부 코드를 제외하고 실제 비즈니스 로직(Custom Code)에서 발생한 에러만 추출합니다.
+
+    MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method)
+    WHERE m.isFramework = false
+    RETURN m.fullName AS CustomMethod, ex.type AS ExceptionType, count(ex) AS Count
+    ORDER BY Count DESC
+    LIMIT 10;
+
+#### ③ 가장 빈번하게 발생한 예외 유형 및 메시지 Top 10
+
+    MATCH (ex:Exception)
+    RETURN ex.type AS ExceptionType, ex.message AS Message, count(ex) AS Frequency
+    ORDER BY Frequency DESC
+    LIMIT 10;
+
+──────
+
+### 3. 데이터 및 테이블 상태 확인 쿼리
+
+데이터가 정상적으로 저장되어 있는지 빠르게 확인할 때 유용합니다.
+
+#### ① 노드 테이블별 데이터 건수 확인
+
+    MATCH (t:Thread) RETURN 'Thread' AS TableName, count(t) AS Count
+    UNION ALL
+    MATCH (ex:Exception) RETURN 'Exception' AS TableName, count(ex) AS Count
+    UNION ALL
+    MATCH (m:Method) RETURN 'Method' AS TableName, count(m) AS Count
+    UNION ALL
+    MATCH (c:Class) RETURN 'Class' AS TableName, count(c) AS Count;
+
+#### ② 최근 발생한 예외 및 스택트레이스 상세 확인
+
+    MATCH (ex:Exception)-[:OCCURRED_IN]->(m:Method)
+    RETURN ex.timestamp AS Time, ex.type AS Type, m.fullName AS Method, ex.stackTrace AS StackTrace
+    ORDER BY ex.timestamp DESC
+    LIMIT 5;
+
+### 그래프(노드-엣지 시각화)로 출력되는 쿼리 모음
+
+#### 1. 스레드 ➔ 예외 ➔ 메서드 전체 연결 그래프 (추천)
+
+    MATCH p = (t:Thread)-[:RAISED]->(ex:Exception)-[:OCCURRED_IN]->(m:Method)
+    RETURN p
+    LIMIT 30
+
+#### 2. 예외 인과관계 체인 그래프 (Caused By)
+
+    MATCH p = (e1:Exception)-[:CAUSED_BY]->(e2:Exception)
+    RETURN p
+    LIMIT 30
+
+#### 3. 메서드 간 호출 흐름 그래프 (CALLS)
+
+    MATCH p = (m1:Method)-[:CALLS]->(m2:Method)
+    RETURN p
+    LIMIT 30
+
+#### 4. DB 내에 연결되어 있는 모든 관계 샘플 보기
+
+노드와 릴레이션 종류에 상관없이 연결된 그래프를 한눈에 볼 때 사용합니다.
+
+    MATCH p = (a)-[r]->(b)
+    RETURN p
+    LIMIT 50
+
+#### 5. 특정 예외 노드들만 점(Circle) 형태로 띄워보기
+
+    MATCH (ex:Exception)
+    RETURN ex
+    LIMIT 40
+
+```
+
+```
