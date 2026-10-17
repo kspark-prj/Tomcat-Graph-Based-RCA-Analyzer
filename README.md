@@ -114,10 +114,9 @@ uv run main.py
 
 PyInstaller 네이티브 스플래시 화면 및 아이콘 리소스가 포함된 원클릭 패키징 명령어입니다.
 
-````bash
+```bash
 uv run pyinstaller -w -D --noupx --clean --icon=main.ico --add-data "splash.png;." --exclude-module PIL --exclude-module Pillow --exclude-module tkinter --exclude-module unittest --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.Qt3D --exclude-module PyQt6.QtQuick main.py
 ```
-````
 
 ### kuzu explorer docker 웹 대시보드
 
@@ -152,8 +151,6 @@ LIMIT 30;
     RETURN *
     LIMIT 30;
 
-──────
-
 ### 2. 근본 원인 분석 (RCA) 통계 쿼리 (Table View 추천)
 
 #### ① 에러 발생 빈도 1위 메서드 Top 10 (장애 유발 핵심 메서드)
@@ -181,8 +178,6 @@ Spring, Tomcat, JDK 내부 코드를 제외하고 실제 비즈니스 로직(Cus
     RETURN ex.type AS ExceptionType, ex.message AS Message, count(ex) AS Frequency
     ORDER BY Frequency DESC
     LIMIT 10;
-
-──────
 
 ### 3. 데이터 및 테이블 상태 확인 쿼리
 
@@ -238,7 +233,3 @@ Spring, Tomcat, JDK 내부 코드를 제외하고 실제 비즈니스 로직(Cus
     MATCH (ex:Exception)
     RETURN ex
     LIMIT 40
-
-```
-
-```
