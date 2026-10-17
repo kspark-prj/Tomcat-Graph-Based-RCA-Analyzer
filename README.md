@@ -126,7 +126,7 @@ docker run -p 8000:8000 \
  -e MODE=READ_ONLY \
  --rm kuzudb/explorer:0.11.3
 
-### 1. Kùzu Explorer 그래프 시각화 쿼리 (가장 추천)
+### 1. Kùzu Explorer 그래프 시각화 쿼리
 
 Explorer의 강점인 노드와 관계선 시각화 그래프를 바로 확인할 수 있는 쿼리입니다.
 
@@ -151,7 +151,7 @@ LIMIT 30;
     RETURN *
     LIMIT 30;
 
-### 2. 근본 원인 분석 (RCA) 통계 쿼리 (Table View 추천)
+### 2. 근본 원인 분석 (RCA) 통계 쿼리
 
 #### ① 에러 발생 빈도 1위 메서드 Top 10 (장애 유발 핵심 메서드)
 
@@ -202,7 +202,7 @@ Spring, Tomcat, JDK 내부 코드를 제외하고 실제 비즈니스 로직(Cus
 
 ### 그래프(노드-엣지 시각화)로 출력되는 쿼리 모음
 
-#### 1. 스레드 ➔ 예외 ➔ 메서드 전체 연결 그래프 (추천)
+#### 1. 스레드 ➔ 예외 ➔ 메서드 전체 연결 그래프
 
     MATCH p = (t:Thread)-[:RAISED]->(ex:Exception)-[:OCCURRED_IN]->(m:Method)
     RETURN p
