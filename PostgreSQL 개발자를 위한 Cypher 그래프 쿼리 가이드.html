@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL 개발자를 위한 Cypher 그래프 쿼리 가이드</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-purple: #c084fc;
+            --accent-yellow: #fde047;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --code-bg: #090d16;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            color: var(--accent-color);
+            margin-bottom: 0.8rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-color);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        section {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent-green);
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            color: var(--accent-purple);
+            margin: 1.5rem 0 0.8rem 0;
+        }
+
+        p, li {
+            color: #cbd5e1;
+            margin-bottom: 0.8rem;
+        }
+
+        ul, ol {
+            padding-left: 1.5rem;
+        }
+
+        /* 비교 테이블 */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(15, 23, 42, 0.6);
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* 문법 인터랙티브 카드 */
+        .syntax-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.2rem;
+            margin: 1.5rem 0;
+        }
+
+        .syntax-card {
+            background-color: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+        }
+
+        .syntax-card .symbol {
+            font-family: 'Fira Code', monospace;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--accent-yellow);
+            margin-bottom: 0.5rem;
+        }
+
+        /* 코드 블록 */
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.2rem;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Fira Code', Consolas, Monaco, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #e2e8f0;
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: 'Fira Code', Consolas, Monaco, monospace;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--accent-yellow);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.88em;
+        }
+
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        /* 구문 강조 */
+        .keyword { color: #f43f5e; font-weight: bold; }
+        .label { color: #38bdf8; }
+        .rel { color: #4ade80; }
+        .var { color: #fde047; }
+        .string { color: #38bdf8; }
+        .number { color: #fb923c; }
+        .comment { color: #64748b; font-style: italic; }
+
+        .callout {
+            background: rgba(56, 189, 248, 0.08);
+            border-left: 4px solid var(--accent-color);
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1.2rem 0;
+        }
+
+        .callout-title {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 0.3rem;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <header>
+        <span class="badge">RDBMS Developer Guide</span>
+        <h1>PostgreSQL 개발자를 위한 Cypher 그래프 쿼리 가이드</h1>
+        <p>테이블과 조인(JOIN) 사고방식에서 노드와 관계(Edge) 중심의 내비게이션 모델로 전환하기</p>
+    </header>
+
+    <!-- 섹션 1: RDBMS vs Graph DB 패러다임 비교 -->
+    <section>
+        <h2>1. RDBMS (PostgreSQL) vs Cypher 개념 대조</h2>
+        <p>PostgreSQL에 익숙한 개발자는 그래프 데이터베이스의 용어를 기존 DB 개념에 대입하면 빠르게 이해할 수 있습니다.</p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>개념</th>
+                        <th>PostgreSQL (RDBMS)</th>
+                        <th>Cypher (Graph DB / Neo4j)</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>실체 (Entity)</strong></td>
+                        <td>행 (Row) / 레코드</td>
+                        <td><strong>노드 (Node)</strong></td>
+                        <td>개별 데이터 객체 (예: 개별 메서드, 예외, 스레드)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>분류 (Type)</strong></td>
+                        <td>테이블명 (Table Name)</td>
+                        <td><strong>라벨 (Label)</strong></td>
+                        <td>노드의 종류를 구분 (예: <code>:Method</code>, <code>:Exception</code>)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>연결 (Link)</strong></td>
+                        <td>외래키 (FK) + JOIN 테이블</td>
+                        <td><strong>관계 (Relationship / Edge)</strong></td>
+                        <td>노드와 노드를 물리적으로 직접 잇는 포인터 연결</td>
+                    </tr>
+                    <tr>
+                        <td><strong>속성 (Data)</strong></td>
+                        <td>컬럼 (Column)</td>
+                        <td><strong>속성 (Property)</strong></td>
+                        <td>노드나 관계 내부에 Key-Value 형태로 저장되는 데이터</td>
+                    </tr>
+                    <tr>
+                        <td><strong>조회 (Query)</strong></td>
+                        <td><code>SELECT ... FROM ... JOIN</code></td>
+                        <td><code>MATCH ... RETURN</code></td>
+                        <td>연결된 패스(Path) 모양을 시각적으로 묘사하여 검색</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="callout">
+            <div class="callout-title">💡 핵심 차이: JOIN 연산의 본질적 차이</div>
+            RDBMS는 외래키 값을 대조하는 <strong>비교 연산(Index Lookup / Hash Join)</strong>을 수행하지만, Graph DB는 메모리상에서 연결된 포인터를 바로 따라가는 <strong>Pointer Hopping (Index-free Adjacency)</strong> 방식을 사용합니다. 따라서 관계가 10단계 이상 깊어져도 검색 성능이 저하되지 않습니다.
+        </div>
+    </section>
+
+    <!-- 섹션 2: Cypher 핵심 기호 정의 -->
+    <section>
+        <h2>2. Cypher 문법 요소 및 핵심 기호 정의</h2>
+        <p>Cypher는 아스키 아트(ASCII Art)처럼 데이터의 연결 상태를 시각적으로 그리듯이 작성합니다.</p>
+
+        <div class="syntax-grid">
+            <div class="syntax-card">
+                <div class="symbol">( ) - 소괄호</div>
+                <strong>노드 (Node)</strong>
+                <p>그래프상의 '점'을 뜻합니다. 테이블의 Row에 대응합니다.</p>
+                <p>예: <code>(m:Method)</code></p>
+            </div>
+            <div class="syntax-card">
+                <div class="symbol">[ ] - 대괄호</div>
+                <strong>관계 (Relationship)</strong>
+                <p>노드를 잇는 '선'을 뜻합니다. FK / JOIN 역할을 대신합니다.</p>
+                <p>예: <code>-[r:CALLS]-></code></p>
+            </div>
+            <div class="syntax-card">
+                <div class="symbol">- &amp; -&gt; - 방향키</div>
+                <strong>관계의 방향성</strong>
+                <p><code>-</code>는 양방향(무방향), <code>-></code>는 단방향 흐름을 뜻합니다.</p>
+                <p>예: <code>(Caller)-[:CALLS]->(Callee)</code></p>
+            </div>
+            <div class="syntax-card">
+                <div class="symbol">p = ... - 패스 변수</div>
+                <strong>경로 (Path)</strong>
+                <p>노드-관계-노드로 이어지는 전체 구성을 묶은 객체입니다.</p>
+                <p>예: <code>MATCH p = (a)-[r]->(b)</code></p>
+            </div>
+        </div>
+
+        <h3>변수 (Alias) 할당의 이해</h3>
+        <p>SQL에서 <code>FROM users AS u</code>처럼 테이블이나 컬럼에 별칭을 붙이듯, Cypher에서는 노드나 관계 앞에 별칭을 작성합니다.</p>
+<pre><code><span class="keyword">MATCH</span> (<span class="var">caller</span>:<span class="label">Method</span>)-[<span class="var">r</span>:<span class="rel">CALLS</span>]->(<span class="var">callee</span>:<span class="label">Method</span>)
+<span class="keyword">RETURN</span> <span class="var">caller</span>.fullName, <span class="var">callee</span>.fullName</code></pre>
+    </section>
+
+    <!-- 섹션 3: 데이터 모델 생성 (CREATE) 실습 -->
+    <section>
+        <h2>3. [실습] 장애 분석(RCA) 데이터 모델 정의 및 데이터 생성 (CREATE)</h2>
+        <p>조회 쿼리를 이해하기 전, 그래프 DB에 데이터가 어떤 구조로 적재되는지 <code>CREATE</code> 문을 통해 먼저 살펴봅니다.</p>
+
+        <h3>📋 분석 대상 노드 <code>(m:Method)</code>가 보유한 속성 정의</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>속성명 (Property)</th>
+                        <th>데이터 타입</th>
+                        <th>설명 (RDBMS 컬럼 대응)</th>
+                        <th>예시 값</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>m.name</code></td>
+                        <td>String</td>
+                        <td>메서드 단독 이름</td>
+                        <td><code>"authenticate"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>m.fullName</code></td>
+                        <td>String</td>
+                        <td>패키지명을 포함한 전체 메서드 명</td>
+                        <td><code>"com.auth.Service.authenticate"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>m.isFramework</code></td>
+                        <td>Boolean</td>
+                        <td>프레임워크 내부 코드 여부</td>
+                        <td><code>false</code> (사용자 코드) / <code>true</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>m.executionTime</code></td>
+                        <td>Integer</td>
+                        <td>수행 시간 (ms)</td>
+                        <td><code>650</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>🛠️ 샘플 데이터 적재 (CREATE 쿼리)</h3>
+        <p>스레드가 예외를 일으키고, 예외가 특정 메서드에서 발생했으며, 메서드 간에 호출(CALLS)이 이루어지는 구조를 생성합니다.</p>
+<pre><code><span class="comment">-- 1. 스레드, 예외, 메서드 노드를 생성하고 관계(-[:RAISED]->, -[:OCCURRED_IN]->)로 연결합니다.</span>
+<span class="keyword">CREATE</span> (<span class="var">t</span>:<span class="label">Thread</span> { <span class="var">name</span>: <span class="string">"http-nio-8080-exec-1"</span> })
+       -[:<span class="rel">RAISED</span>]->
+       (<span class="var">ex</span>:<span class="label">Exception</span> { <span class="var">type</span>: <span class="string">"NullPointerException"</span>, <span class="var">message</span>: <span class="string">"User object is null"</span> })
+       -[:<span class="rel">OCCURRED_IN</span>]->
+       (<span class="var">m1</span>:<span class="label">Method</span> { <span class="var">name</span>: <span class="string">"authenticate"</span>, <span class="var">fullName</span>: <span class="string">"com.auth.AuthService.authenticate"</span>, <span class="var">isFramework</span>: <span class="keyword">false</span>, <span class="var">executionTime</span>: <span class="number">650</span> });
+
+<span class="comment">-- 2. 메서드 간 호출 관계(CALLS)를 추가로 생성합니다.</span>
+<span class="keyword">CREATE</span> (<span class="var">m2</span>:<span class="label">Method</span> { <span class="var">name</span>: <span class="string">"doLogin"</span>, <span class="var">fullName</span>: <span class="string">"com.web.LoginController.doLogin"</span>, <span class="var">isFramework</span>: <span class="keyword">false</span>, <span class="var">executionTime</span>: <span class="number">800</span> })
+       -[<span class="var">r</span>:<span class="rel">CALLS</span> { <span class="var">callCount</span>: <span class="number">12</span> }]->
+       (<span class="var">m1</span>);</code></pre>
+    </section>
+
+    <!-- 섹션 4: 속성(Properties)을 활용한 MATCH 쿼리 -->
+    <section>
+        <h2>4. 속성(Properties)을 활용한 조건 필터링 쿼리 (MATCH)</h2>
+        <p>앞서 적재된 데이터를 대상으로 조건에 맞는 노드를 조회하는 <code>MATCH</code> 쿼리 예시입니다.</p>
+
+        <h3>① 인라인 필터: 노드 생성 시점의 속성 지정</h3>
+<pre><code><span class="comment">-- PostgreSQL: SELECT fullName FROM methods WHERE name = 'authenticate';</span>
+<span class="keyword">MATCH</span> (<span class="var">m</span>:<span class="label">Method</span> { <span class="var">name</span>: <span class="string">'authenticate'</span> })
+<span class="keyword">RETURN</span> <span class="var">m</span>.<span class="var">fullName</span>;</code></pre>
+
+        <h3>② WHERE 절을 이용한 속성 조건 필터링</h3>
+<pre><code><span class="comment">-- PostgreSQL: SELECT fullName, execution_time FROM methods </span>
+<span class="comment">--            WHERE is_framework = false AND execution_time > 500 ORDER BY execution_time DESC;</span>
+<span class="keyword">MATCH</span> (<span class="var">m</span>:<span class="label">Method</span>)
+<span class="keyword">WHERE</span> <span class="var">m</span>.isFramework = <span class="keyword">false</span> <span class="keyword">AND</span> <span class="var">m</span>.executionTime > <span class="number">500</span>
+<span class="keyword">RETURN</span> <span class="var">m</span>.<span class="var">fullName</span>, <span class="var">m</span>.<span class="var">executionTime</span>
+<span class="keyword">ORDER BY</span> <span class="var">m</span>.<span class="var">executionTime</span> <span class="keyword">DESC</span>;</code></pre>
+    </section>
+
+    <!-- 섹션 5: 실무 애플리케이션 장애 분석(RCA) 쿼리 해설 -->
+    <section>
+        <h2>5. 실무 애플리케이션 장애 분석(RCA) 쿼리 해설</h2>
+
+        <h3>패턴 1. 전체 연결 그래프 시각화 (Path 바인딩)</h3>
+<pre><code><span class="keyword">MATCH</span> <span class="var">p</span> = (<span class="var">t</span>:<span class="label">Thread</span>)-[:<span class="rel">RAISED</span>]->(<span class="var">ex</span>:<span class="label">Exception</span>)-[:<span class="rel">OCCURRED_IN</span>]->(<span class="var">m</span>:<span class="label">Method</span>)
+<span class="keyword">RETURN</span> <span class="var">p</span>
+<span class="keyword">LIMIT</span> <span class="number">30</span>;</code></pre>
+
+        <h3>패턴 2. 통계 집계 및 필터링 (GROUP BY 자동 처리)</h3>
+<pre><code><span class="keyword">MATCH</span> (<span class="var">ex</span>:<span class="label">Exception</span>)-[:<span class="rel">OCCURRED_IN</span>]->(<span class="var">m</span>:<span class="label">Method</span>)
+<span class="keyword">WHERE</span> <span class="var">m</span>.isFramework = <span class="keyword">false</span>
+<span class="keyword">RETURN</span> 
+    <span class="var">m</span>.fullName <span class="keyword">AS</span> CustomMethod, 
+    <span class="var">ex</span>.type <span class="keyword">AS</span> ExceptionType, 
+    <span class="keyword">count</span>(<span class="var">ex</span>) <span class="keyword">AS</span> ErrorCount
+<span class="keyword">ORDER BY</span> ErrorCount <span class="keyword">DESC</span>
+<span class="keyword">LIMIT</span> <span class="number">10</span>;</code></pre>
+        <div class="callout">
+            <div class="callout-title">💡 자동 GROUP BY 특징</div>
+            Cypher는 <code>count()</code> 같은 집계 함수를 사용할 때 SQL처럼 <code>GROUP BY</code> 절을 명시할 필요 없이, <code>RETURN</code>에 포함된 비집계 컬럼을 기준으로 <strong>자동 GROUP BY</strong>를 수행합니다.
+        </div>
+    </section>
+
+    <!-- 섹션 6: 핵심 요약 -->
+    <section>
+        <h2>6. 가이드 요약 (Cheat Sheet)</h2>
+        <ol>
+            <li><strong>데이터 생성(`CREATE`):</strong> 조회 전, 노드와 관계를 시각적인 모양 그대로 엮어서 적재합니다.</li>
+            <li><strong>괄호 구분:</strong> 노드는 동그란 소괄호 <code>()</code>, 관계는 사각형 대괄호 <code>[]</code>로 표기합니다.</li>
+            <li><strong>화살표 방향:</strong> <code>(a)-[r]->(b)</code>는 a에서 b로 향하는 방향이 존재하는 관계입니다.</li>
+            <li><strong>속성 접근:</strong> PostgreSQL의 컬럼처럼 <code>m.name</code>, <code>ex.type</code> 형태로 속성값을 읽거나 조건에 활용합니다.</li>
+            <li><strong>시각화:</strong> <code>p = (패턴)</code> 형태로 저장 후 <code>RETURN p</code> 하면 그래프 화면 전체가 출력됩니다.</li>
+        </ol>
+    </section>
+
+    <footer>
+        <p>Application Diagnostics &amp; RCA Graph Database Training Material</p>
+    </footer>
+
+</div>
+
+</body>
+</html>
